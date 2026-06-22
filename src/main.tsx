@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import {
   Activity,
   Bot,
+  ChevronDown,
+  ChevronRight,
   Check,
   CircleStop,
   Cpu,
@@ -53,6 +55,15 @@ function App() {
   const [draft, setDraft] = useState("");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("theme") as Theme) || "light");
   const [isSending, setIsSending] = useState(false);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+
+  const activeProject = useMemo(() => snapshot?.projects.find((project) => project.id === activeProjectId) ?? snapshot?.projects[0], [activeProjectId, snapshot]);
+  const activeSession = useMemo(
+    () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? activeProject?.sessions[0],
+    [activeProject, activeSessionId]
+  );
+  const activeAgent = useMemo(() => snapshot?.config.providers.find((agent) => agent.id === agentId) ?? snapshot?.config.providers[0], [agentId, snapshot]);
+  const activeRun = useMemo(() => snapshot?.runs.find((run) => run.sessionId === activeSession?.id && run.status === "running"), [activeSession, snapshot]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -105,6 +116,17 @@ function App() {
     }
   }, [activeProjectId, activeSessionId, agentId, snapshot]);
 
+  useEffect(() => {
+    if (!activeProject) return;
+    setExpandedPaths((current) => {
+      if (current.has(activeProject.path)) return current;
+      const next = new Set(current);
+      next.add(activeProject.path);
+      activeProject.files.filter((node) => node.kind === "directory").slice(0, 8).forEach((node) => next.add(node.path));
+      return next;
+    });
+  }, [activeProject]);
+
   async function refresh() {
     setSnapshot(await loadSnapshot());
   }
@@ -155,13 +177,17 @@ function App() {
     setSnapshot(await reloadConfig());
   }
 
-  const activeProject = useMemo(() => snapshot?.projects.find((project) => project.id === activeProjectId) ?? snapshot?.projects[0], [activeProjectId, snapshot]);
-  const activeSession = useMemo(
-    () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? activeProject?.sessions[0],
-    [activeProject, activeSessionId]
-  );
-  const activeAgent = useMemo(() => snapshot?.config.providers.find((agent) => agent.id === agentId) ?? snapshot?.config.providers[0], [agentId, snapshot]);
-  const activeRun = useMemo(() => snapshot?.runs.find((run) => run.sessionId === activeSession?.id && run.status === "running"), [activeSession, snapshot]);
+  function togglePath(path: string) {
+    setExpandedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }
 
   if (!snapshot) {
     return (
@@ -305,57 +331,100 @@ function App() {
       </section>
 
       <aside className="contextPane">
-        <PanelTitle icon={<Cpu size={18} />} title="Agent Pool" />
-        <div className="agentPool">
-          {snapshot.config.providers.map((agent) => (
-            <button key={agent.id} className={`agentCard ${agent.id === activeAgent?.id ? "active" : ""}`} onClick={() => setAgentId(agent.id)}>
-              <strong>{agent.label}</strong>
-              <span>{agent.command} {agent.args.join(" ")}</span>
-              <div className="chips">{(agent.capabilities || []).map((capability) => <b key={capability}>{capability}</b>)}</div>
-            </button>
-          ))}
-        </div>
-
-        <PanelTitle icon={<Sparkles size={18} />} title="Skills" />
-        <div className="pathConfig">
-          <div>
-            <strong>{snapshot.config.defaults.skillsRoot || "skills"}</strong>
-            <span>Markdown skill 目录</span>
+        <section className="contextGroup">
+          <PanelTitle icon={<Cpu size={18} />} title="Agent" />
+          <div className="agentPool">
+            {snapshot.config.providers.map((agent) => (
+              <button key={agent.id} className={`agentCard ${agent.id === activeAgent?.id ? "active" : ""}`} onClick={() => setAgentId(agent.id)}>
+                <strong>{agent.label}</strong>
+                <span>{agent.command} {agent.args.join(" ")}</span>
+                <div className="chips">{(agent.capabilities || []).map((capability) => <b key={capability}>{capability}</b>)}</div>
+              </button>
+            ))}
           </div>
-          <button className="secondaryButton" onClick={chooseSkillsRoot}>
-            <FolderOpen size={16} />
-            选择
-          </button>
-        </div>
-        <div className="skillSummary">
-          {snapshot.skills.map((skill) => (
-            <label key={skill.id} className="checkRow">
-              <input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} />
-              <span><Check size={14} /> {skill.title}</span>
-            </label>
-          ))}
-        </div>
+        </section>
 
-        <PanelTitle icon={<PanelRight size={18} />} title="Project Files" />
-        <div className="contextFileTree">
-          {activeProject?.files.length ? activeProject.files.map((node) => <FileTreeNode key={node.path} node={node} depth={0} />) : <span className="mutedText">打开项目后显示文件树</span>}
-        </div>
+        <section className="contextGroup">
+          <PanelTitle icon={<Sparkles size={18} />} title="Skills" />
+          <div className="pathConfig">
+            <div>
+              <strong>{snapshot.config.defaults.skillsRoot || "skills"}</strong>
+              <span>{snapshot.skills.length} skills loaded</span>
+            </div>
+            <button className="secondaryButton compact" onClick={chooseSkillsRoot}>
+              <FolderOpen size={16} />
+            </button>
+          </div>
+          <div className="skillSummary">
+            {snapshot.skills.map((skill) => (
+              <label key={skill.id} className="checkRow">
+                <input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} />
+                <span><Check size={14} /> {skill.title}</span>
+              </label>
+            ))}
+          </div>
+        </section>
 
-        <PanelTitle icon={<Zap size={18} />} title="Usage" />
-        <div className="usageCompact">
-          <strong>{snapshot.usage.tokensUsed.toLocaleString()}</strong>
-          <span>/ {snapshot.usage.tokenBudget.toLocaleString()} tokens</span>
-        </div>
+        <section className="contextGroup projectFilesGroup">
+          <div className="projectFilesHeader">
+            <PanelTitle icon={<PanelRight size={18} />} title="Project Files" />
+            {activeProject && <span>{countFiles(activeProject.files)} items</span>}
+          </div>
+          <div className="contextFileTree">
+            {activeProject ? (
+              <div className="fileTreeRoot">
+                <button className="fileTreeRootButton" onClick={() => togglePath(activeProject.path)}>
+                  {expandedPaths.has(activeProject.path) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <Folder size={14} />
+                  <strong>{activeProject.name}</strong>
+                </button>
+                {expandedPaths.has(activeProject.path) && (
+                  <div className="fileChildren">
+                    {activeProject.files.map((node) => (
+                      <FileTreeNode key={node.path} node={node} depth={0} expandedPaths={expandedPaths} onToggle={togglePath} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="mutedText">打开项目后显示文件树</span>
+            )}
+          </div>
+        </section>
+
+        <section className="contextGroup">
+          <PanelTitle icon={<Zap size={18} />} title="Usage" />
+          <div className="usageCompact">
+            <strong>{snapshot.usage.tokensUsed.toLocaleString()}</strong>
+            <span>/ {snapshot.usage.tokenBudget.toLocaleString()} tokens</span>
+          </div>
+        </section>
       </aside>
     </main>
   );
 }
 
-function FileTreeNode({ node, depth }: { node: FileNode; depth: number }) {
+function FileTreeNode({
+  node,
+  depth,
+  expandedPaths,
+  onToggle
+}: {
+  node: FileNode;
+  depth: number;
+  expandedPaths: Set<string>;
+  onToggle: (path: string) => void;
+}) {
+  const isDirectory = node.kind === "directory";
+  const isExpanded = expandedPaths.has(node.path);
   return (
-    <div className="fileNode" style={{ paddingLeft: `${depth * 12 + 8}px` }}>
-      <div title={node.path}>{node.kind === "directory" ? <Folder size={14} /> : <File size={14} />} {node.name}</div>
-      {node.children.map((child) => <FileTreeNode key={child.path} node={child} depth={depth + 1} />)}
+    <div className="fileNode">
+      <button className="fileNodeButton" style={{ paddingLeft: `${depth * 12 + 8}px` }} title={node.path} onClick={() => isDirectory && onToggle(node.path)}>
+        {isDirectory ? isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="fileSpacer" />}
+        {isDirectory ? <Folder size={14} /> : <File size={14} />}
+        <span>{node.name}</span>
+      </button>
+      {isDirectory && isExpanded && node.children.map((child) => <FileTreeNode key={child.path} node={child} depth={depth + 1} expandedPaths={expandedPaths} onToggle={onToggle} />)}
     </div>
   );
 }
@@ -388,6 +457,10 @@ function roleLabel(role: string) {
 
 function toggleSkill(skillId: string, skillIds: string[], setSkillIds: React.Dispatch<React.SetStateAction<string[]>>) {
   setSkillIds(skillIds.includes(skillId) ? skillIds.filter((id) => id !== skillId) : [...skillIds, skillId]);
+}
+
+function countFiles(nodes: FileNode[]): number {
+  return nodes.reduce((sum, node) => sum + 1 + countFiles(node.children), 0);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

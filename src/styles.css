@@ -109,8 +109,11 @@ button:disabled {
 }
 
 .contextPane {
-  overflow: auto;
-  padding: 18px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  overflow: hidden;
+  padding: 14px;
   border-left: 1px solid var(--line);
 }
 
@@ -508,12 +511,24 @@ textarea {
   font-size: 14px;
 }
 
+.contextGroup {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 10px 28px var(--shadow);
+}
+
+.projectFilesGroup {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .agentPool,
-.skillSummary,
-.contextFileTree {
+.skillSummary {
   display: grid;
   gap: 8px;
-  margin-bottom: 22px;
 }
 
 .agentCard {
@@ -522,7 +537,7 @@ textarea {
   width: 100%;
   min-width: 0;
   padding: 11px;
-  background: transparent;
+  background: color-mix(in srgb, var(--panel-solid) 62%, transparent);
   text-align: left;
 }
 
@@ -551,12 +566,14 @@ textarea {
 
 .pathConfig {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  margin-bottom: 12px;
+  align-items: center;
+  margin-bottom: 10px;
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel-solid) 62%, transparent);
 }
 
 .pathConfig strong,
@@ -593,31 +610,83 @@ textarea {
   color: var(--accent);
 }
 
-.contextFileTree {
-  max-height: min(270px, 30vh);
-  overflow: auto;
-  padding: 6px 0;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-}
-
-.fileNode > div {
+.projectFilesHeader {
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-width: 0;
-  min-height: 25px;
-  overflow: hidden;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.projectFilesHeader .panelTitle {
+  margin-bottom: 8px;
+}
+
+.projectFilesHeader span {
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.contextFileTree {
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--field) 80%, transparent);
+}
+
+.fileTreeRootButton,
+.fileNodeButton {
+  display: grid;
+  grid-template-columns: 14px 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+  padding-right: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fileNode svg {
+.fileTreeRootButton {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.fileNodeButton:hover,
+.fileTreeRootButton:hover {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.fileNodeButton span,
+.fileTreeRootButton strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSpacer {
+  width: 13px;
+}
+
+.fileNode svg,
+.fileTreeRootButton svg {
   flex: 0 0 auto;
   color: var(--accent);
+}
+
+.fileChildren {
+  margin-top: 2px;
 }
 
 .usageCompact {
@@ -629,6 +698,12 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
+}
+
+.compact {
+  min-width: 36px;
+  width: 36px;
+  padding: 0;
 }
 
 @media (max-width: 1080px) {

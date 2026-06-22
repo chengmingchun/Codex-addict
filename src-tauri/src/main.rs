@@ -796,12 +796,19 @@ fn read_file_tree(root: &Path, depth: usize, max_depth: usize) -> Vec<FileNode> 
     }
     let mut nodes = Vec::new();
     let Ok(entries) = fs::read_dir(root) else { return nodes };
-    for entry in entries.flatten().take(160) {
+    let mut entries = entries.flatten().collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        let a_path = a.path();
+        let b_path = b.path();
+        let a_is_dir = a_path.is_dir();
+        let b_is_dir = b_path.is_dir();
+        b_is_dir
+            .cmp(&a_is_dir)
+            .then(a.file_name().to_string_lossy().to_lowercase().cmp(&b.file_name().to_string_lossy().to_lowercase()))
+    });
+    for entry in entries.into_iter().filter(|entry| !should_skip(&entry.file_name().to_string_lossy())).take(96) {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        if should_skip(&name) {
-            continue;
-        }
         let is_dir = path.is_dir();
         nodes.push(FileNode {
             name,
@@ -810,15 +817,28 @@ fn read_file_tree(root: &Path, depth: usize, max_depth: usize) -> Vec<FileNode> 
             children: if is_dir { read_file_tree(&path, depth + 1, max_depth) } else { Vec::new() },
         });
     }
-    nodes.sort_by(|a, b| a.kind.cmp(&b.kind).then(a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     nodes
 }
 
 fn should_skip(name: &str) -> bool {
     matches!(
         name,
-        ".git" | "node_modules" | "target" | "dist" | "release" | ".run" | ".next" | ".cache"
-    )
+        ".git"
+            | ".hg"
+            | ".svn"
+            | "node_modules"
+            | "target"
+            | "dist"
+            | "build"
+            | "release"
+            | ".run"
+            | ".next"
+            | ".nuxt"
+            | ".cache"
+            | ".turbo"
+            | ".vite"
+            | "coverage"
+    ) || name.ends_with(".log")
 }
 
 fn emit_snapshot(app: &AppHandle, snapshot: &ServerSnapshot) {
