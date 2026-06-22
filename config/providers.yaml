@@ -4,9 +4,11 @@ providers:
     command: opencode
     args:
       - run
-      - "--json"
+      - "--format"
+      - json
     concurrency: 2
     cwd: "."
+    inputMode: arg
     shell: true
     capabilities:
       - repo-search
@@ -21,6 +23,7 @@ providers:
       - run
     concurrency: 3
     cwd: "."
+    inputMode: stdin
     shell: true
     capabilities:
       - company-wrapper
@@ -36,6 +39,7 @@ providers:
       - task
     concurrency: 1
     cwd: "."
+    inputMode: stdin
     shell: true
     capabilities:
       - claude-compatible

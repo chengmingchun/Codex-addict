@@ -26,6 +26,7 @@ struct AgentConfig {
     args: Vec<String>,
     concurrency: usize,
     cwd: String,
+    input_mode: Option<String>,
     shell: Option<bool>,
     env: HashMap<String, String>,
     capabilities: Option<Vec<String>>,
@@ -211,6 +212,25 @@ fn reload_config(app: AppHandle, state: State<RuntimeState>) -> Result<ServerSna
     let snapshot = {
         let mut inner = state.0.lock().map_err(|error| error.to_string())?;
         inner.config = read_config(&inner.root_dir)?;
+        inner.skills = read_skills(&inner.root_dir, &inner.config)?;
+        make_snapshot(&inner)
+    };
+    emit_snapshot(&app, &snapshot);
+    Ok(snapshot)
+}
+
+#[tauri::command]
+fn update_agent_config(app: AppHandle, state: State<RuntimeState>, agent: AgentConfig) -> Result<ServerSnapshot, String> {
+    let snapshot = {
+        let mut inner = state.0.lock().map_err(|error| error.to_string())?;
+        let index = inner
+            .config
+            .providers
+            .iter()
+            .position(|provider| provider.id == agent.id)
+            .ok_or_else(|| "Agent provider not found.".to_string())?;
+        inner.config.providers[index] = agent;
+        write_config(&inner.root_dir, &inner.config)?;
         inner.skills = read_skills(&inner.root_dir, &inner.config)?;
         make_snapshot(&inner)
     };
@@ -479,18 +499,23 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
 fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: AgentConfig, project: Project, session: Session, selected_skills: Vec<Skill>) {
     let prompt = build_prompt(&project, &session, &selected_skills);
     thread::spawn(move || {
+        let input_mode = agent.input_mode.as_deref().unwrap_or("stdin").to_string();
+        let mut effective_args = agent.args.clone();
+        if input_mode == "arg" {
+            effective_args.push(prompt.clone());
+        }
         let mut command = if agent.shell.unwrap_or(false) {
-            shell_command(&agent)
+            shell_command(&agent, &effective_args)
         } else {
             let mut command = Command::new(&agent.command);
-            command.args(&agent.args);
+            command.args(&effective_args);
             command
         };
 
         command
             .current_dir(PathBuf::from(&project.path))
             .envs(agent.env.clone())
-            .stdin(Stdio::piped())
+            .stdin(if input_mode == "stdin" { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         apply_no_window(&mut command);
@@ -505,8 +530,10 @@ fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: Age
             }
         };
 
-        if let Some(mut stdin) = child.stdin.take() {
+        if input_mode == "stdin" {
+            if let Some(mut stdin) = child.stdin.take() {
             let _ = stdin.write_all(prompt.as_bytes());
+            }
         }
         if let Some(stdout) = child.stdout.take() {
             spawn_reader(app.clone(), state.clone(), run.clone(), "assistant", stdout);
@@ -755,12 +782,12 @@ fn make_usage(inner: &Inner) -> UsageSnapshot {
     }
 }
 
-fn shell_command(provider: &AgentConfig) -> Command {
+fn shell_command(provider: &AgentConfig, args: &[String]) -> Command {
     #[cfg(target_os = "windows")]
     {
         let mut command = Command::new("cmd");
-        let full = std::iter::once(provider.command.clone())
-            .chain(provider.args.clone())
+        let full = std::iter::once(quote_shell_arg(&provider.command))
+            .chain(args.iter().map(|arg| quote_shell_arg(arg)))
             .collect::<Vec<_>>()
             .join(" ");
         command.args(["/C", &full]);
@@ -769,13 +796,23 @@ fn shell_command(provider: &AgentConfig) -> Command {
     #[cfg(not(target_os = "windows"))]
     {
         let mut command = Command::new("sh");
-        let full = std::iter::once(provider.command.clone())
-            .chain(provider.args.clone())
+        let full = std::iter::once(quote_shell_arg(&provider.command))
+            .chain(args.iter().map(|arg| quote_shell_arg(arg)))
             .collect::<Vec<_>>()
             .join(" ");
         command.args(["-lc", &full]);
         command
     }
+}
+
+fn quote_shell_arg(value: &str) -> String {
+    if value.is_empty() {
+        return "\"\"".to_string();
+    }
+    if value.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '\\' | ':' | '=')) {
+        return value.to_string();
+    }
+    format!("\"{}\"", value.replace('"', "\\\""))
 }
 
 fn apply_no_window(command: &mut Command) {
@@ -854,6 +891,13 @@ fn emit_snapshot_from_state(app: &AppHandle, state: &Arc<Mutex<Inner>>) {
 fn read_config(root_dir: &Path) -> Result<AppConfig, String> {
     let raw = fs::read_to_string(root_dir.join("config").join("providers.yaml")).map_err(|error| error.to_string())?;
     serde_yaml::from_str(&raw).map_err(|error| error.to_string())
+}
+
+fn write_config(root_dir: &Path, config: &AppConfig) -> Result<(), String> {
+    let config_dir = root_dir.join("config");
+    fs::create_dir_all(&config_dir).map_err(|error| error.to_string())?;
+    let raw = serde_yaml::to_string(config).map_err(|error| error.to_string())?;
+    fs::write(config_dir.join("providers.yaml"), raw).map_err(|error| error.to_string())
 }
 
 fn load_state(state_path: &Path) -> PersistedState {
@@ -974,6 +1018,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             snapshot,
             reload_config,
+            update_agent_config,
             pick_directory,
             open_project,
             create_session,

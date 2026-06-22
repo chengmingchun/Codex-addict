@@ -16,7 +16,9 @@ import {
   Moon,
   PanelRight,
   RefreshCw,
+  Save,
   Send,
+  Settings2,
   Sparkles,
   Sun,
   Terminal,
@@ -31,12 +33,17 @@ import {
   reloadConfig,
   sendMessage,
   setSkillsRoot,
-  subscribeToUpdates
+  subscribeToUpdates,
+  updateAgentConfig
 } from "./api";
-import type { FileNode, ServerSnapshot } from "./types";
+import type { AgentConfig, FileNode, ServerSnapshot } from "./types";
 import "./styles.css";
 
 type Theme = "dark" | "light";
+type AgentDraft = Pick<AgentConfig, "command" | "concurrency"> & {
+  args: string;
+  inputMode: NonNullable<AgentConfig["inputMode"]>;
+};
 
 const statusText: Record<string, string> = {
   queued: "排队",
@@ -56,6 +63,7 @@ function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("theme") as Theme) || "light");
   const [isSending, setIsSending] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [agentDraft, setAgentDraft] = useState<AgentDraft>({ command: "", args: "", concurrency: 1, inputMode: "stdin" });
 
   const activeProject = useMemo(() => snapshot?.projects.find((project) => project.id === activeProjectId) ?? snapshot?.projects[0], [activeProjectId, snapshot]);
   const activeSession = useMemo(
@@ -64,6 +72,16 @@ function App() {
   );
   const activeAgent = useMemo(() => snapshot?.config.providers.find((agent) => agent.id === agentId) ?? snapshot?.config.providers[0], [agentId, snapshot]);
   const activeRun = useMemo(() => snapshot?.runs.find((run) => run.sessionId === activeSession?.id && run.status === "running"), [activeSession, snapshot]);
+
+  useEffect(() => {
+    if (!activeAgent) return;
+    setAgentDraft({
+      command: activeAgent.command,
+      args: activeAgent.args.join(" "),
+      concurrency: activeAgent.concurrency,
+      inputMode: activeAgent.inputMode || "stdin"
+    });
+  }, [activeAgent]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -175,6 +193,19 @@ function App() {
 
   async function reloadEverything() {
     setSnapshot(await reloadConfig());
+  }
+
+  async function saveAgentSettings() {
+    if (!activeAgent) return;
+    const updated: AgentConfig = {
+      ...activeAgent,
+      command: agentDraft.command.trim() || activeAgent.command,
+      args: parseArgs(agentDraft.args),
+      concurrency: Math.max(1, Number(agentDraft.concurrency) || 1),
+      inputMode: agentDraft.inputMode
+    };
+    setSnapshot(await updateAgentConfig(updated));
+    setAgentId(updated.id);
   }
 
   function togglePath(path: string) {
@@ -333,15 +364,52 @@ function App() {
       <aside className="contextPane">
         <section className="contextGroup">
           <PanelTitle icon={<Cpu size={18} />} title="Agent" />
-          <div className="agentPool">
+          <select className="selectControl" value={activeAgent?.id || ""} onChange={(event) => setAgentId(event.target.value)}>
             {snapshot.config.providers.map((agent) => (
-              <button key={agent.id} className={`agentCard ${agent.id === activeAgent?.id ? "active" : ""}`} onClick={() => setAgentId(agent.id)}>
-                <strong>{agent.label}</strong>
-                <span>{agent.command} {agent.args.join(" ")}</span>
-                <div className="chips">{(agent.capabilities || []).map((capability) => <b key={capability}>{capability}</b>)}</div>
-              </button>
+              <option key={agent.id} value={agent.id}>
+                {agent.label}
+              </option>
             ))}
+          </select>
+          <div className="agentCommandLine">
+            <Terminal size={14} />
+            <span>{activeAgent ? `${activeAgent.command} ${activeAgent.args.join(" ")}` : "No agent selected"}</span>
           </div>
+          <div className="chips compactChips">{(activeAgent?.capabilities || []).map((capability) => <b key={capability}>{capability}</b>)}</div>
+          <details className="configDetails">
+            <summary>
+              <Settings2 size={15} />
+              调用配置
+            </summary>
+            <div className="configForm">
+              <label className="fieldLabel">
+                命令
+                <input className="textInput" value={agentDraft.command} onChange={(event) => setAgentDraft((current) => ({ ...current, command: event.target.value }))} />
+              </label>
+              <label className="fieldLabel">
+                参数
+                <input className="textInput" value={agentDraft.args} onChange={(event) => setAgentDraft((current) => ({ ...current, args: event.target.value }))} />
+              </label>
+              <div className="formGrid">
+                <label className="fieldLabel">
+                  Prompt
+                  <select className="selectControl" value={agentDraft.inputMode} onChange={(event) => setAgentDraft((current) => ({ ...current, inputMode: event.target.value as AgentDraft["inputMode"] }))}>
+                    <option value="arg">位置参数</option>
+                    <option value="stdin">stdin</option>
+                    <option value="none">不传入</option>
+                  </select>
+                </label>
+                <label className="fieldLabel">
+                  并发
+                  <input className="textInput" type="number" min={1} max={8} value={agentDraft.concurrency} onChange={(event) => setAgentDraft((current) => ({ ...current, concurrency: Number(event.target.value) }))} />
+                </label>
+              </div>
+              <button className="secondaryButton saveConfigButton" onClick={saveAgentSettings}>
+                <Save size={15} />
+                保存到 providers.yaml
+              </button>
+            </div>
+          </details>
         </section>
 
         <section className="contextGroup">
@@ -355,14 +423,24 @@ function App() {
               <FolderOpen size={16} />
             </button>
           </div>
-          <div className="skillSummary">
-            {snapshot.skills.map((skill) => (
-              <label key={skill.id} className="checkRow">
-                <input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} />
-                <span><Check size={14} /> {skill.title}</span>
-              </label>
-            ))}
-          </div>
+          <details className="dropdownPanel">
+            <summary>
+              <span>{skillIds.length ? `已选 ${skillIds.length} 个` : "未选择 skill"}</span>
+              <ChevronDown size={15} />
+            </summary>
+            <div className="skillMenu">
+              {snapshot.skills.length ? (
+                snapshot.skills.map((skill) => (
+                  <label key={skill.id} className="checkRow">
+                    <input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} />
+                    <span><Check size={14} /> {skill.title}</span>
+                  </label>
+                ))
+              ) : (
+                <span className="mutedText">当前目录没有加载到 skill markdown</span>
+              )}
+            </div>
+          </details>
         </section>
 
         <section className="contextGroup projectFilesGroup">
@@ -461,6 +539,10 @@ function toggleSkill(skillId: string, skillIds: string[], setSkillIds: React.Dis
 
 function countFiles(nodes: FileNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countFiles(node.children), 0);
+}
+
+function parseArgs(value: string) {
+  return value.match(/"[^"]*"|'[^']*'|\S+/g)?.map((item) => item.replace(/^["']|["']$/g, "")) ?? [];
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

@@ -5,6 +5,7 @@ export type AgentConfig = {
   args: string[];
   concurrency: number;
   cwd: string;
+  inputMode?: "stdin" | "arg" | "none";
   shell?: boolean;
   env: Record<string, string>;
   capabilities?: string[];

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AgentRun, Project, ServerSnapshot, Session } from "./types";
+import type { AgentConfig, AgentRun, Project, ServerSnapshot, Session } from "./types";
 
 type SnapshotHandler = (snapshot: ServerSnapshot) => void;
 type RunHandler = (run: AgentRun) => void;
@@ -14,6 +14,10 @@ export async function loadSnapshot() {
 
 export async function reloadConfig() {
   return invoke<ServerSnapshot>("reload_config");
+}
+
+export async function updateAgentConfig(agent: AgentConfig) {
+  return invoke<ServerSnapshot>("update_agent_config", { agent });
 }
 
 export async function pickDirectory(startPath?: string) {
