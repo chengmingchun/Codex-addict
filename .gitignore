@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# frontend build
+dist/
+dist-server/
+
+# tauri / rust build
+src-tauri/target/
+src-tauri/gen/
+
+# electron legacy build output
+release/
+
+# local runtime logs
+.run/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# env
+.env
+.env.*
+

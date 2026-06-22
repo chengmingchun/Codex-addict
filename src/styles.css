@@ -1,0 +1,681 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+  --bg: #111213;
+  --window: #171819;
+  --sidebar: rgba(28, 29, 31, 0.86);
+  --panel: rgba(32, 33, 35, 0.72);
+  --panel-solid: #242529;
+  --field: #151619;
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(78, 164, 255, 0.38);
+  --text: #f5f6f7;
+  --muted: #a4a8ae;
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.14);
+  --green: #32d074;
+  --warning: #ffd166;
+  --danger: #ff6b81;
+  --shadow: rgba(0, 0, 0, 0.22);
+  background: var(--bg);
+  color: var(--text);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef1f5;
+  --window: #f7f8fb;
+  --sidebar: rgba(248, 249, 252, 0.78);
+  --panel: rgba(255, 255, 255, 0.72);
+  --panel-solid: #ffffff;
+  --field: #ffffff;
+  --line: rgba(28, 31, 36, 0.11);
+  --line-strong: rgba(0, 122, 255, 0.32);
+  --text: #1d1d1f;
+  --muted: #727780;
+  --accent: #007aff;
+  --accent-soft: rgba(0, 122, 255, 0.11);
+  --green: #248a3d;
+  --warning: #a36a00;
+  --danger: #d33d55;
+  --shadow: rgba(24, 31, 42, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 34%),
+    linear-gradient(180deg, var(--window), var(--bg));
+  color: var(--text);
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: minmax(196px, 248px) minmax(0, 1fr) minmax(250px, 320px);
+  width: 100vw;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar,
+.contextPane {
+  min-width: 0;
+  background: var(--sidebar);
+  backdrop-filter: blur(22px);
+}
+
+.sidebar {
+  display: grid;
+  grid-template-rows: auto auto minmax(116px, auto) minmax(0, 1fr);
+  border-right: 1px solid var(--line);
+}
+
+.contextPane {
+  overflow: auto;
+  padding: 18px;
+  border-left: 1px solid var(--line);
+}
+
+.brand {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 18px 16px 14px;
+}
+
+.brandMark,
+.iconButton {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: 0 10px 26px var(--shadow);
+}
+
+.brandMark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.iconButton {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 11px;
+}
+
+.brand strong,
+.navProject span,
+.sessionItem strong,
+.agentCard strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand span,
+.sessionItem span,
+.agentCard span,
+.pathConfig span,
+.mutedText,
+.composerFooter span,
+.usageCompact span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 0 12px 14px;
+}
+
+.openProjectButton,
+.primaryButton,
+.ghostButton,
+.secondaryButton,
+.navProject,
+.sessionItem,
+.createFirstSession,
+.agentCard,
+.checkRow span {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: inherit;
+}
+
+.openProjectButton,
+.createFirstSession {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 11px;
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.navSection {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 14px;
+}
+
+.sectionLabel {
+  padding: 0 8px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sidebarEmpty {
+  padding: 14px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.navProject {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.navProject.active,
+.sessionItem.active,
+.agentCard.active {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+}
+
+.sessionsNav {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.sessionItem {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 9px;
+  width: 100%;
+  min-height: 56px;
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 99px;
+  background: var(--muted);
+}
+
+.statusDot.running {
+  background: var(--green);
+}
+
+.statusDot.failed {
+  background: var(--danger);
+}
+
+.statusDot.queued {
+  background: var(--warning);
+}
+
+.mainPane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--window) 82%, transparent);
+}
+
+.sessionHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding: 18px 22px 12px;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 100%;
+  margin: 4px 0;
+  overflow: hidden;
+  font-size: 24px;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionHeader p {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.metric {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 7px;
+  min-width: 70px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.metric svg {
+  color: var(--warning);
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.metric b {
+  grid-column: 2;
+}
+
+.thread {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 22px 18px;
+}
+
+.threadEmpty {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  gap: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.threadEmpty strong,
+.threadEmpty span {
+  max-width: min(420px, 90%);
+}
+
+.message {
+  max-width: min(860px, 100%);
+  margin-bottom: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.message.user {
+  margin-left: auto;
+  background: var(--accent-soft);
+}
+
+.message.assistant {
+  background: var(--panel-solid);
+}
+
+.message.system,
+.message.tool {
+  background: color-mix(in srgb, var(--warning) 9%, var(--panel-solid));
+}
+
+.message header {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.message pre {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.composer {
+  min-width: 0;
+  margin: 0 22px 20px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 16px 38px var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.composerMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.composerMeta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: 34vh;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  outline: 0;
+  background: var(--field);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.composerFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.primaryButton,
+.ghostButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  min-width: 88px;
+  padding: 0 13px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.primaryButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+
+.ghostButton {
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel-solid));
+  color: var(--danger);
+}
+
+.secondaryButton {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+  font-size: 14px;
+}
+
+.agentPool,
+.skillSummary,
+.contextFileTree {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.agentCard {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  background: transparent;
+  text-align: left;
+}
+
+.agentCard span {
+  display: block;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chips b {
+  max-width: 100%;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pathConfig {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.pathConfig strong,
+.pathConfig span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkRow input {
+  position: absolute;
+  opacity: 0;
+}
+
+.checkRow span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.checkRow span svg {
+  flex: 0 0 auto;
+}
+
+.checkRow input:checked + span {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.contextFileTree {
+  max-height: min(270px, 30vh);
+  overflow: auto;
+  padding: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.fileNode > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 25px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileNode svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.usageCompact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+@media (max-width: 1080px) {
+  .appShell {
+    grid-template-columns: minmax(176px, 220px) minmax(0, 1fr) minmax(220px, 270px);
+  }
+
+  .brand {
+    padding: 14px 12px;
+  }
+
+  .sidebarActions {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionHeader {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px 16px 10px;
+  }
+
+  .headerActions {
+    flex-wrap: wrap;
+  }
+
+  .thread {
+    padding: 0 16px 16px;
+  }
+
+  .composer {
+    margin: 0 16px 16px;
+  }
+
+  .contextPane {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .appShell {
+    grid-template-columns: 188px minmax(0, 1fr);
+  }
+
+  .contextPane {
+    display: none;
+  }
+
+  .metric {
+    min-width: 62px;
+  }
+}

@@ -1,0 +1,49 @@
+providers:
+  - id: opencode
+    label: OpenCode
+    command: opencode
+    args:
+      - run
+      - "--json"
+    concurrency: 2
+    cwd: "."
+    shell: true
+    capabilities:
+      - repo-search
+      - code-edit
+      - json-output
+    env: {}
+  - id: cac
+    label: CAC OpenCode Wrapper
+    command: cac
+    args:
+      - opencode
+      - run
+    concurrency: 3
+    cwd: "."
+    shell: true
+    capabilities:
+      - company-wrapper
+      - code-edit
+      - review
+      - test-run
+    env:
+      CAC_PROFILE: default
+  - id: codeagent
+    label: ClaudeCode Agent Wrapper
+    command: codeagent
+    args:
+      - task
+    concurrency: 1
+    cwd: "."
+    shell: true
+    capabilities:
+      - claude-compatible
+      - code-edit
+      - planning
+    env: {}
+defaults:
+  providerId: opencode
+  maxGlobalConcurrency: 3
+  workspaceRoot: ".."
+  skillsRoot: "skills"
