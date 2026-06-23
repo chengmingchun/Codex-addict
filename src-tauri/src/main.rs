@@ -2,6 +2,8 @@
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::{
     collections::HashMap,
     fs,
@@ -12,8 +14,6 @@ use std::{
     thread,
     time::Duration,
 };
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
@@ -220,7 +220,11 @@ fn reload_config(app: AppHandle, state: State<RuntimeState>) -> Result<ServerSna
 }
 
 #[tauri::command]
-fn update_agent_config(app: AppHandle, state: State<RuntimeState>, agent: AgentConfig) -> Result<ServerSnapshot, String> {
+fn update_agent_config(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    agent: AgentConfig,
+) -> Result<ServerSnapshot, String> {
     let snapshot = {
         let mut inner = state.0.lock().map_err(|error| error.to_string())?;
         let index = inner
@@ -239,23 +243,34 @@ fn update_agent_config(app: AppHandle, state: State<RuntimeState>, agent: AgentC
 }
 
 #[tauri::command]
-fn pick_directory(state: State<RuntimeState>, start_path: Option<String>) -> Result<Option<String>, String> {
+fn pick_directory(
+    state: State<RuntimeState>,
+    start_path: Option<String>,
+) -> Result<Option<String>, String> {
     let start = {
         let inner = state.0.lock().map_err(|error| error.to_string())?;
         start_path
             .filter(|value| !value.trim().is_empty())
             .map(PathBuf::from)
-            .unwrap_or_else(|| resolve_workspace_root(&inner.root_dir, &inner.config.defaults.workspace_root))
+            .unwrap_or_else(|| {
+                resolve_workspace_root(&inner.root_dir, &inner.config.defaults.workspace_root)
+            })
     };
     let mut dialog = rfd::FileDialog::new();
     if start.exists() {
         dialog = dialog.set_directory(start);
     }
-    Ok(dialog.pick_folder().map(|path| path.to_string_lossy().to_string()))
+    Ok(dialog
+        .pick_folder()
+        .map(|path| path_to_display_string(&path)))
 }
 
 #[tauri::command]
-fn open_project(app: AppHandle, state: State<RuntimeState>, path: String) -> Result<Project, String> {
+fn open_project(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    path: String,
+) -> Result<Project, String> {
     let project_path = normalize_path(PathBuf::from(path));
     if !project_path.is_dir() {
         return Err("Project path must be a directory.".to_string());
@@ -277,7 +292,7 @@ fn open_project(app: AppHandle, state: State<RuntimeState>, path: String) -> Res
         let project = inner.projects.entry(id.clone()).or_insert(Project {
             id: id.clone(),
             name,
-            path: project_path.to_string_lossy().to_string(),
+            path: path_to_display_string(&project_path),
             created_at: now(),
             updated_at: now(),
             sessions: Vec::new(),
@@ -285,7 +300,7 @@ fn open_project(app: AppHandle, state: State<RuntimeState>, path: String) -> Res
         });
         project.updated_at = now();
         project.files = files;
-        let project = project.clone();
+        let project = display_project(project.clone());
         inner.active_project_id = Some(project.id.clone());
         inner.active_session_id = project.sessions.first().map(|session| session.id.clone());
         save_state(&inner);
@@ -296,7 +311,11 @@ fn open_project(app: AppHandle, state: State<RuntimeState>, path: String) -> Res
 }
 
 #[tauri::command]
-fn create_session(app: AppHandle, state: State<RuntimeState>, request: CreateSessionRequest) -> Result<Session, String> {
+fn create_session(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    request: CreateSessionRequest,
+) -> Result<Session, String> {
     let session = {
         let mut inner = state.0.lock().map_err(|error| error.to_string())?;
         let project = inner
@@ -328,7 +347,11 @@ fn create_session(app: AppHandle, state: State<RuntimeState>, request: CreateSes
 }
 
 #[tauri::command]
-fn send_message(app: AppHandle, state: State<RuntimeState>, request: SendMessageRequest) -> Result<AgentRun, String> {
+fn send_message(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    request: SendMessageRequest,
+) -> Result<AgentRun, String> {
     if request.content.trim().is_empty() {
         return Err("Message is required.".to_string());
     }
@@ -345,7 +368,14 @@ fn send_message(app: AppHandle, state: State<RuntimeState>, request: SendMessage
             .find(|session| session.id == request.session_id)
             .ok_or_else(|| "Session not found.".to_string())?;
         if session.title == "新会话" {
-            session.title = request.content.lines().next().unwrap_or("新会话").chars().take(48).collect();
+            session.title = request
+                .content
+                .lines()
+                .next()
+                .unwrap_or("新会话")
+                .chars()
+                .take(48)
+                .collect();
         }
         session.agent_id = request.agent_id.clone();
         session.skill_ids = request.skill_ids.clone();
@@ -384,17 +414,29 @@ fn send_message(app: AppHandle, state: State<RuntimeState>, request: SendMessage
 }
 
 #[tauri::command]
-fn cancel_run(app: AppHandle, state: State<RuntimeState>, run_id: String) -> Result<AgentRun, String> {
+fn cancel_run(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    run_id: String,
+) -> Result<AgentRun, String> {
     let run = {
         let mut inner = state.0.lock().map_err(|error| error.to_string())?;
         if let Some(child) = inner.children.get(&run_id) {
             let _ = child.lock().map_err(|error| error.to_string())?.kill();
         }
-        let run = inner.runs.get_mut(&run_id).ok_or_else(|| "Run not found.".to_string())?;
+        let run = inner
+            .runs
+            .get_mut(&run_id)
+            .ok_or_else(|| "Run not found.".to_string())?;
         run.status = RunStatus::Cancelled;
         run.finished_at = Some(now());
         let run = run.clone();
-        set_session_status(&mut inner, &run.project_id, &run.session_id, RunStatus::Cancelled);
+        set_session_status(
+            &mut inner,
+            &run.project_id,
+            &run.session_id,
+            RunStatus::Cancelled,
+        );
         save_state(&inner);
         run
     };
@@ -404,7 +446,11 @@ fn cancel_run(app: AppHandle, state: State<RuntimeState>, run_id: String) -> Res
 }
 
 #[tauri::command]
-fn set_skills_root(app: AppHandle, state: State<RuntimeState>, skills_root: String) -> Result<ServerSnapshot, String> {
+fn set_skills_root(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    skills_root: String,
+) -> Result<ServerSnapshot, String> {
     let snapshot = {
         let mut inner = state.0.lock().map_err(|error| error.to_string())?;
         inner.config.defaults.skills_root = Some(skills_root);
@@ -423,7 +469,11 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
                 Ok(guard) => guard,
                 Err(_) => return,
             };
-            let running_total = inner.runs.values().filter(|run| run.status == RunStatus::Running).count();
+            let running_total = inner
+                .runs
+                .values()
+                .filter(|run| run.status == RunStatus::Running)
+                .count();
             if running_total >= inner.config.defaults.max_global_concurrency {
                 emit_snapshot(&app, &make_snapshot(&inner));
                 return;
@@ -439,7 +489,12 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
 
             let mut selected = None;
             for run in queued {
-                let Some(agent) = inner.config.providers.iter().find(|agent| agent.id == run.agent_id) else {
+                let Some(agent) = inner
+                    .config
+                    .providers
+                    .iter()
+                    .find(|agent| agent.id == run.agent_id)
+                else {
                     fail_run(&mut inner, &run, "Agent provider not found.");
                     continue;
                 };
@@ -462,19 +517,33 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
             run.status = RunStatus::Running;
             run.started_at = Some(now());
             inner.runs.insert(run.id.clone(), run.clone());
-            set_session_status(&mut inner, &run.project_id, &run.session_id, RunStatus::Running);
+            set_session_status(
+                &mut inner,
+                &run.project_id,
+                &run.session_id,
+                RunStatus::Running,
+            );
             push_session_message(
                 &mut inner,
                 &run.project_id,
                 &run.session_id,
                 "system",
-                format!("Starting {}: {} {}", agent.label, agent.command, agent.args.join(" ")),
+                format!(
+                    "Starting {}: {} {}",
+                    agent.label,
+                    agent.command,
+                    agent.args.join(" ")
+                ),
             );
 
             let project = inner.projects.get(&run.project_id).cloned();
-            let session = project
-                .as_ref()
-                .and_then(|project| project.sessions.iter().find(|session| session.id == run.session_id).cloned());
+            let session = project.as_ref().and_then(|project| {
+                project
+                    .sessions
+                    .iter()
+                    .find(|session| session.id == run.session_id)
+                    .cloned()
+            });
             let selected_skills = session
                 .as_ref()
                 .map(|session| {
@@ -492,11 +561,27 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
         };
 
         emit_snapshot_from_state(&app, &state);
-        start_run(app.clone(), state.clone(), next.0, next.1, next.2, next.3, next.4);
+        start_run(
+            app.clone(),
+            state.clone(),
+            next.0,
+            next.1,
+            next.2,
+            next.3,
+            next.4,
+        );
     }
 }
 
-fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: AgentConfig, project: Project, session: Session, selected_skills: Vec<Skill>) {
+fn start_run(
+    app: AppHandle,
+    state: Arc<Mutex<Inner>>,
+    run: AgentRun,
+    agent: AgentConfig,
+    project: Project,
+    session: Session,
+    selected_skills: Vec<Skill>,
+) {
     let prompt = build_prompt(&project, &session, &selected_skills);
     thread::spawn(move || {
         let input_mode = agent.input_mode.as_deref().unwrap_or("stdin").to_string();
@@ -515,7 +600,11 @@ fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: Age
         command
             .current_dir(PathBuf::from(&project.path))
             .envs(agent.env.clone())
-            .stdin(if input_mode == "stdin" { Stdio::piped() } else { Stdio::null() })
+            .stdin(if input_mode == "stdin" {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         apply_no_window(&mut command);
@@ -532,7 +621,7 @@ fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: Age
 
         if input_mode == "stdin" {
             if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(prompt.as_bytes());
+                let _ = stdin.write_all(prompt.as_bytes());
             }
         }
         if let Some(stdout) = child.stdout.take() {
@@ -568,7 +657,13 @@ fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: Age
             RunStatus::Failed
         };
         finish_run(&app, &state, &run.id, final_status, exit_code);
-        append_output(&app, &state, &run, "system", format!("Exited with code {:?}.", exit_code));
+        append_output(
+            &app,
+            &state,
+            &run,
+            "system",
+            format!("Exited with code {:?}.", exit_code),
+        );
         if let Ok(mut inner) = state.lock() {
             inner.children.remove(&run.id);
         }
@@ -576,7 +671,13 @@ fn start_run(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, agent: Age
     });
 }
 
-fn spawn_reader<R: Read + Send + 'static>(app: AppHandle, state: Arc<Mutex<Inner>>, run: AgentRun, role: &'static str, mut reader: R) {
+fn spawn_reader<R: Read + Send + 'static>(
+    app: AppHandle,
+    state: Arc<Mutex<Inner>>,
+    run: AgentRun,
+    role: &'static str,
+    mut reader: R,
+) {
     thread::spawn(move || {
         let mut buffer = [0; 1024];
         loop {
@@ -592,7 +693,13 @@ fn spawn_reader<R: Read + Send + 'static>(app: AppHandle, state: Arc<Mutex<Inner
     });
 }
 
-fn append_output<T: Into<String>>(app: &AppHandle, state: &Arc<Mutex<Inner>>, run: &AgentRun, role: &str, text: T) {
+fn append_output<T: Into<String>>(
+    app: &AppHandle,
+    state: &Arc<Mutex<Inner>>,
+    run: &AgentRun,
+    role: &str,
+    text: T,
+) {
     let (updated_run, updated_session) = {
         let mut inner = match state.lock() {
             Ok(guard) => guard,
@@ -621,20 +728,33 @@ fn append_output<T: Into<String>>(app: &AppHandle, state: &Arc<Mutex<Inner>>, ru
     }
 }
 
-fn finish_run(app: &AppHandle, state: &Arc<Mutex<Inner>>, run_id: &str, status: RunStatus, exit_code: Option<i32>) {
+fn finish_run(
+    app: &AppHandle,
+    state: &Arc<Mutex<Inner>>,
+    run_id: &str,
+    status: RunStatus,
+    exit_code: Option<i32>,
+) {
     let (run, session) = {
         let mut inner = match state.lock() {
             Ok(guard) => guard,
             Err(_) => return,
         };
-        let Some(stored_run) = inner.runs.get_mut(run_id) else { return };
+        let Some(stored_run) = inner.runs.get_mut(run_id) else {
+            return;
+        };
         if stored_run.status != RunStatus::Cancelled {
             stored_run.status = status.clone();
         }
         stored_run.exit_code = exit_code;
         stored_run.finished_at = Some(now());
         let run = stored_run.clone();
-        set_session_status(&mut inner, &run.project_id, &run.session_id, run.status.clone());
+        set_session_status(
+            &mut inner,
+            &run.project_id,
+            &run.session_id,
+            run.status.clone(),
+        );
         let session = find_session(&inner, &run.project_id, &run.session_id).cloned();
         (run, session)
     };
@@ -654,7 +774,13 @@ fn fail_run(inner: &mut Inner, run: &AgentRun, text: &str) {
         stored_run.finished_at = Some(now());
     }
     set_session_status(inner, &run.project_id, &run.session_id, RunStatus::Failed);
-    push_session_message(inner, &run.project_id, &run.session_id, "system", text.to_string());
+    push_session_message(
+        inner,
+        &run.project_id,
+        &run.session_id,
+        "system",
+        text.to_string(),
+    );
 }
 
 fn set_session_status(inner: &mut Inner, project_id: &str, session_id: &str, status: RunStatus) {
@@ -664,7 +790,13 @@ fn set_session_status(inner: &mut Inner, project_id: &str, session_id: &str, sta
     }
 }
 
-fn push_session_message<T: Into<String>>(inner: &mut Inner, project_id: &str, session_id: &str, role: &str, content: T) {
+fn push_session_message<T: Into<String>>(
+    inner: &mut Inner,
+    project_id: &str,
+    session_id: &str,
+    role: &str,
+    content: T,
+) {
     if let Some(session) = find_session_mut(inner, project_id, session_id) {
         session.messages.push(Message {
             id: short_id(),
@@ -676,7 +808,13 @@ fn push_session_message<T: Into<String>>(inner: &mut Inner, project_id: &str, se
     }
 }
 
-fn append_session_output(inner: &mut Inner, project_id: &str, session_id: &str, role: &str, content: String) {
+fn append_session_output(
+    inner: &mut Inner,
+    project_id: &str,
+    session_id: &str,
+    role: &str,
+    content: String,
+) {
     if let Some(session) = find_session_mut(inner, project_id, session_id) {
         if let Some(last) = session.messages.last_mut() {
             if last.role == role {
@@ -704,7 +842,11 @@ fn find_session<'a>(inner: &'a Inner, project_id: &str, session_id: &str) -> Opt
         .find(|session| session.id == session_id)
 }
 
-fn find_session_mut<'a>(inner: &'a mut Inner, project_id: &str, session_id: &str) -> Option<&'a mut Session> {
+fn find_session_mut<'a>(
+    inner: &'a mut Inner,
+    project_id: &str,
+    session_id: &str,
+) -> Option<&'a mut Session> {
     inner
         .projects
         .get_mut(project_id)?
@@ -739,14 +881,26 @@ fn build_prompt(project: &Project, session: &Session, selected_skills: &[Skill])
 fn make_snapshot(inner: &Inner) -> ServerSnapshot {
     let mut projects = inner.projects.values().cloned().collect::<Vec<_>>();
     for project in &mut projects {
-        project.sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        project
+            .sessions
+            .sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sanitize_project_paths(project);
     }
     projects.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     let mut runs = inner.runs.values().cloned().collect::<Vec<_>>();
     runs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    let skills = inner
+        .skills
+        .iter()
+        .cloned()
+        .map(|mut skill| {
+            skill.path = display_path_string(&skill.path);
+            skill
+        })
+        .collect();
     ServerSnapshot {
         config: inner.config.clone(),
-        skills: inner.skills.clone(),
+        skills,
         projects,
         active_project_id: inner.active_project_id.clone(),
         active_session_id: inner.active_session_id.clone(),
@@ -761,20 +915,45 @@ fn make_usage(inner: &Inner) -> UsageSnapshot {
         provider_load.insert(
             provider.id.clone(),
             ProviderLoad {
-                running: inner.runs.values().filter(|run| run.agent_id == provider.id && run.status == RunStatus::Running).count(),
-                queued: inner.runs.values().filter(|run| run.agent_id == provider.id && run.status == RunStatus::Queued).count(),
+                running: inner
+                    .runs
+                    .values()
+                    .filter(|run| run.agent_id == provider.id && run.status == RunStatus::Running)
+                    .count(),
+                queued: inner
+                    .runs
+                    .values()
+                    .filter(|run| run.agent_id == provider.id && run.status == RunStatus::Queued)
+                    .count(),
                 concurrency: provider.concurrency,
             },
         );
     }
-    let tokens_used = inner.runs.values().map(|run| run.input_tokens + run.output_tokens).sum();
+    let tokens_used = inner
+        .runs
+        .values()
+        .map(|run| run.input_tokens + run.output_tokens)
+        .sum();
     UsageSnapshot {
-        running: inner.runs.values().filter(|run| run.status == RunStatus::Running).count(),
-        queued: inner.runs.values().filter(|run| run.status == RunStatus::Queued).count(),
+        running: inner
+            .runs
+            .values()
+            .filter(|run| run.status == RunStatus::Running)
+            .count(),
+        queued: inner
+            .runs
+            .values()
+            .filter(|run| run.status == RunStatus::Queued)
+            .count(),
         completed_today: inner
             .runs
             .values()
-            .filter(|run| run.status == RunStatus::Done && run.finished_at.as_ref().is_some_and(|date| date.starts_with(&Local::now().format("%Y-%m-%d").to_string())))
+            .filter(|run| {
+                run.status == RunStatus::Done
+                    && run.finished_at.as_ref().is_some_and(|date| {
+                        date.starts_with(&Local::now().format("%Y-%m-%d").to_string())
+                    })
+            })
             .count(),
         token_budget: 2_000_000,
         tokens_used,
@@ -809,7 +988,9 @@ fn quote_shell_arg(value: &str) -> String {
     if value.is_empty() {
         return "\"\"".to_string();
     }
-    if value.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '\\' | ':' | '=')) {
+    if value.chars().all(|ch| {
+        ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '/' | '\\' | ':' | '=')
+    }) {
         return value.to_string();
     }
     format!("\"{}\"", value.replace('"', "\\\""))
@@ -832,26 +1013,39 @@ fn read_file_tree(root: &Path, depth: usize, max_depth: usize) -> Vec<FileNode> 
         return Vec::new();
     }
     let mut nodes = Vec::new();
-    let Ok(entries) = fs::read_dir(root) else { return nodes };
+    let Ok(entries) = fs::read_dir(root) else {
+        return nodes;
+    };
     let mut entries = entries.flatten().collect::<Vec<_>>();
     entries.sort_by(|a, b| {
         let a_path = a.path();
         let b_path = b.path();
         let a_is_dir = a_path.is_dir();
         let b_is_dir = b_path.is_dir();
-        b_is_dir
-            .cmp(&a_is_dir)
-            .then(a.file_name().to_string_lossy().to_lowercase().cmp(&b.file_name().to_string_lossy().to_lowercase()))
+        b_is_dir.cmp(&a_is_dir).then(
+            a.file_name()
+                .to_string_lossy()
+                .to_lowercase()
+                .cmp(&b.file_name().to_string_lossy().to_lowercase()),
+        )
     });
-    for entry in entries.into_iter().filter(|entry| !should_skip(&entry.file_name().to_string_lossy())).take(96) {
+    for entry in entries
+        .into_iter()
+        .filter(|entry| !should_skip(&entry.file_name().to_string_lossy()))
+        .take(96)
+    {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
         let is_dir = path.is_dir();
         nodes.push(FileNode {
             name,
-            path: path.to_string_lossy().to_string(),
+            path: path_to_display_string(&path),
             kind: if is_dir { "directory" } else { "file" }.to_string(),
-            children: if is_dir { read_file_tree(&path, depth + 1, max_depth) } else { Vec::new() },
+            children: if is_dir {
+                read_file_tree(&path, depth + 1, max_depth)
+            } else {
+                Vec::new()
+            },
         });
     }
     nodes
@@ -889,7 +1083,8 @@ fn emit_snapshot_from_state(app: &AppHandle, state: &Arc<Mutex<Inner>>) {
 }
 
 fn read_config(root_dir: &Path) -> Result<AppConfig, String> {
-    let raw = fs::read_to_string(root_dir.join("config").join("providers.yaml")).map_err(|error| error.to_string())?;
+    let raw = fs::read_to_string(root_dir.join("config").join("providers.yaml"))
+        .map_err(|error| error.to_string())?;
     serde_yaml::from_str(&raw).map_err(|error| error.to_string())
 }
 
@@ -923,7 +1118,10 @@ fn save_state(inner: &Inner) {
 }
 
 fn read_skills(root_dir: &Path, config: &AppConfig) -> Result<Vec<Skill>, String> {
-    let skills_dir = resolve_configured_dir(root_dir, config.defaults.skills_root.as_deref().unwrap_or("skills"));
+    let skills_dir = resolve_configured_dir(
+        root_dir,
+        config.defaults.skills_root.as_deref().unwrap_or("skills"),
+    );
     let mut skills = Vec::new();
     if !skills_dir.exists() {
         return Ok(skills);
@@ -939,12 +1137,21 @@ fn read_skills(root_dir: &Path, config: &AppConfig) -> Result<Vec<Skill>, String
             .lines()
             .find(|line| line.trim_start().starts_with('#'))
             .map(|line| line.trim_start_matches('#').trim().to_string())
-            .unwrap_or_else(|| path.file_stem().unwrap_or_default().to_string_lossy().to_string());
+            .unwrap_or_else(|| {
+                path.file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            });
         skills.push(Skill {
-            id: path.file_stem().unwrap_or_default().to_string_lossy().to_string(),
+            id: path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
             title,
             body,
-            path: path.to_string_lossy().to_string(),
+            path: path_to_display_string(&path),
         });
     }
     skills.sort_by(|a, b| a.title.cmp(&b.title));
@@ -973,6 +1180,39 @@ fn normalize_path(path: PathBuf) -> PathBuf {
     path.canonicalize().unwrap_or(path)
 }
 
+fn path_to_display_string(path: &Path) -> String {
+    display_path_string(&path.to_string_lossy())
+}
+
+fn display_project(mut project: Project) -> Project {
+    sanitize_project_paths(&mut project);
+    project
+}
+
+fn sanitize_project_paths(project: &mut Project) {
+    project.path = display_path_string(&project.path);
+    for node in &mut project.files {
+        sanitize_file_node_paths(node);
+    }
+}
+
+fn sanitize_file_node_paths(node: &mut FileNode) {
+    node.path = display_path_string(&node.path);
+    for child in &mut node.children {
+        sanitize_file_node_paths(child);
+    }
+}
+
+fn display_path_string(value: &str) -> String {
+    if let Some(rest) = value.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{}", rest)
+    } else if let Some(rest) = value.strip_prefix("\\\\?\\") {
+        rest.to_string()
+    } else {
+        value.to_string()
+    }
+}
+
 fn now() -> String {
     Local::now().to_rfc3339()
 }
@@ -987,7 +1227,10 @@ fn rough_tokens(text: &str) -> usize {
 
 fn resolve_root_dir(app: &tauri::App) -> Result<PathBuf, String> {
     if cfg!(debug_assertions) {
-        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf())
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf())
     } else {
         app.path().resource_dir().map_err(|error| error.to_string())
     }
@@ -997,7 +1240,10 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let root_dir = resolve_root_dir(app)?;
-            let app_data_dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|error| error.to_string())?;
             let state_path = app_data_dir.join("state.json");
             let persisted = load_state(&state_path);
             let config = read_config(&root_dir)?;
