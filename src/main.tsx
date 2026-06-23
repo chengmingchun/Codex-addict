@@ -63,6 +63,7 @@ function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("theme") as Theme) || "light");
   const [isSending, setIsSending] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [selectedContextPaths, setSelectedContextPaths] = useState<Set<string>>(new Set());
   const [agentDraft, setAgentDraft] = useState<AgentDraft>({ command: "", args: "", concurrency: 1, inputMode: "stdin" });
 
   const activeProject = useMemo(() => snapshot?.projects.find((project) => project.id === activeProjectId) ?? snapshot?.projects[0], [activeProjectId, snapshot]);
@@ -72,6 +73,7 @@ function App() {
   );
   const activeAgent = useMemo(() => snapshot?.config.providers.find((agent) => agent.id === agentId) ?? snapshot?.config.providers[0], [agentId, snapshot]);
   const activeRun = useMemo(() => snapshot?.runs.find((run) => run.sessionId === activeSession?.id && run.status === "running"), [activeSession, snapshot]);
+  const selectedContextList = useMemo(() => Array.from(selectedContextPaths), [selectedContextPaths]);
 
   useEffect(() => {
     if (!activeAgent) return;
@@ -143,6 +145,7 @@ function App() {
       activeProject.files.filter((node) => node.kind === "directory").slice(0, 8).forEach((node) => next.add(node.path));
       return next;
     });
+    setSelectedContextPaths((current) => new Set(Array.from(current).filter((path) => path.startsWith(activeProject.path))));
   }, [activeProject]);
 
   async function refresh() {
@@ -157,6 +160,7 @@ function App() {
     setSnapshot(next);
     setActiveProjectId(project.id);
     setActiveSessionId(project.sessions[0]?.id);
+    setSelectedContextPaths(new Set());
   }
 
   async function newSession() {
@@ -170,7 +174,13 @@ function App() {
     if (!activeProject || !activeSession || !draft.trim()) return;
     setIsSending(true);
     try {
-      await sendMessage({ projectId: activeProject.id, sessionId: activeSession.id, agentId, skillIds, content: draft });
+      await sendMessage({
+        projectId: activeProject.id,
+        sessionId: activeSession.id,
+        agentId,
+        skillIds,
+        content: withContextPaths(draft, selectedContextList, activeProject.path)
+      });
       setDraft("");
       setSnapshot(await loadSnapshot());
     } finally {
@@ -215,6 +225,19 @@ function App() {
         next.delete(path);
       } else {
         next.add(path);
+      }
+      return next;
+    });
+  }
+
+  function toggleContextPath(path: string, checked?: boolean) {
+    setSelectedContextPaths((current) => {
+      const next = new Set(current);
+      const shouldSelect = checked ?? !next.has(path);
+      if (shouldSelect) {
+        next.add(path);
+      } else {
+        next.delete(path);
       }
       return next;
     });
@@ -326,7 +349,7 @@ function App() {
               <div className="threadEmpty">
                 <Sparkles size={28} />
                 <strong>这个会话还没有消息</strong>
-                <span>右侧选择 Agent 和 Skills，然后从下方输入目标。</span>
+                <span>右侧选择 Agent、Skills 和上下文文件，然后从下方输入目标。</span>
               </div>
             )
           ) : (
@@ -342,6 +365,7 @@ function App() {
           <div className="composerMeta">
             <span>{activeAgent ? `${activeAgent.label}` : "未选择 Agent"}</span>
             <span>{skillIds.length} skills</span>
+            <span>{selectedContextList.length} context files</span>
           </div>
           <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="像使用 Codex 一样，描述你希望当前项目会话继续完成什么..." />
           <div className="composerFooter">
@@ -446,8 +470,13 @@ function App() {
         <section className="contextGroup projectFilesGroup">
           <div className="projectFilesHeader">
             <PanelTitle icon={<PanelRight size={18} />} title="Project Files" />
-            {activeProject && <span>{countFiles(activeProject.files)} items</span>}
+            {activeProject && <span>{selectedContextList.length ? `${selectedContextList.length} selected` : `${countFiles(activeProject.files)} items`}</span>}
           </div>
+          {selectedContextList.length > 0 && (
+            <button className="secondaryButton compact" onClick={() => setSelectedContextPaths(new Set())} title="清空上下文文件">
+              清空上下文
+            </button>
+          )}
           <div className="contextFileTree">
             {activeProject ? (
               <div className="fileTreeRoot">
@@ -459,7 +488,15 @@ function App() {
                 {expandedPaths.has(activeProject.path) && (
                   <div className="fileChildren">
                     {activeProject.files.map((node) => (
-                      <FileTreeNode key={node.path} node={node} depth={0} expandedPaths={expandedPaths} onToggle={togglePath} />
+                      <FileTreeNode
+                        key={node.path}
+                        node={node}
+                        depth={0}
+                        expandedPaths={expandedPaths}
+                        selectedContextPaths={selectedContextPaths}
+                        onToggle={togglePath}
+                        onToggleContext={toggleContextPath}
+                      />
                     ))}
                   </div>
                 )}
@@ -486,23 +523,37 @@ function FileTreeNode({
   node,
   depth,
   expandedPaths,
-  onToggle
+  selectedContextPaths,
+  onToggle,
+  onToggleContext
 }: {
   node: FileNode;
   depth: number;
   expandedPaths: Set<string>;
+  selectedContextPaths: Set<string>;
   onToggle: (path: string) => void;
+  onToggleContext: (path: string, checked?: boolean) => void;
 }) {
   const isDirectory = node.kind === "directory";
   const isExpanded = expandedPaths.has(node.path);
+  const isSelected = selectedContextPaths.has(node.path);
   return (
     <div className="fileNode">
-      <button className="fileNodeButton" style={{ paddingLeft: `${depth * 12 + 8}px` }} title={node.path} onClick={() => isDirectory && onToggle(node.path)}>
+      <button className={`fileNodeButton ${isSelected ? "active" : ""}`} style={{ paddingLeft: `${depth * 12 + 8}px` }} title={node.path} onClick={() => (isDirectory ? onToggle(node.path) : onToggleContext(node.path))}>
         {isDirectory ? isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="fileSpacer" />}
         {isDirectory ? <Folder size={14} /> : <File size={14} />}
         <span>{node.name}</span>
+        {!isDirectory && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => onToggleContext(node.path, event.currentTarget.checked)}
+            aria-label={`选择 ${node.name} 作为上下文`}
+          />
+        )}
       </button>
-      {isDirectory && isExpanded && node.children.map((child) => <FileTreeNode key={child.path} node={child} depth={depth + 1} expandedPaths={expandedPaths} onToggle={onToggle} />)}
+      {isDirectory && isExpanded && node.children.map((child) => <FileTreeNode key={child.path} node={child} depth={depth + 1} expandedPaths={expandedPaths} selectedContextPaths={selectedContextPaths} onToggle={onToggle} onToggleContext={onToggleContext} />)}
     </div>
   );
 }
@@ -543,6 +594,20 @@ function countFiles(nodes: FileNode[]): number {
 
 function parseArgs(value: string) {
   return value.match(/"[^"]*"|'[^']*'|\S+/g)?.map((item) => item.replace(/^["']|["']$/g, "")) ?? [];
+}
+
+function withContextPaths(content: string, paths: string[], projectPath: string) {
+  if (!paths.length) return content;
+  const relativePaths = paths.map((path) => path.replace(projectPath, ".").replace(/^[/\\]/, ""));
+  return [
+    "Selected project context files:",
+    ...relativePaths.map((path) => `- ${path}`),
+    "",
+    "Instruction: inspect the files above from the current project directory before making changes or answering.",
+    "",
+    "User task:",
+    content.trim()
+  ].join("\n");
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
