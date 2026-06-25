@@ -1,113 +1,92 @@
-# Intra Codex (Polished)
+# Intra Codex
 
-Intra Codex 是一个面向公司内网的 **Agent Workbench（类 Codex 桌面工作台）**，用于把分散的 CLI Agent 能力（opencode / cac / codeagent 等）统一编排成“项目 + 会话 + Skills + 上下文”的持续工作流。
+Intra Codex 是一个面向公司内网的本地 Agent Workbench。它不自己实现模型能力，而是把已经安装在电脑或内网环境里的 agent CLI 做成能力池，再提供类似 Codex 的上层交互：项目、会话、Skills、上下文文件、并发调度和用量看板。
 
----
+## 目标
 
-## ✨ 这版增强点（Polished）
+- 用一个桌面窗口统一调用 `opencode`、`cac`、`codeagent` 等本地 CLI agent。
+- 按项目文件夹管理会话，保留历史、运行状态和输出流。
+- 像 Codex 一样选择 Skills，把 Markdown 工作流片段注入到 agent prompt。
+- 在文件树中勾选上下文文件，由后端安全读取、裁剪并打包进任务。
+- 支持浅色/深色主题，默认浅色。
+- 输出单个 Windows exe，方便内网分发。
 
-这一版主要强化三件事：
+## 当前能力
 
-### 🧠 1. 上下文工程（Context Engineering Ready）
+- Tauri + React 桌面应用。
+- 可配置 Agent Provider：命令、参数、并发、prompt 传入方式。
+- `inputMode` 支持：
+  - `arg`：把 prompt 作为最后一个位置参数传入，适合 `opencode run --format json <message>`。
+  - `stdin`：把 prompt 写入标准输入，适合内部 wrapper。
+  - `none`：只启动命令，不传 prompt。
+- 项目文件树选择器。
+- 安全上下文打包：
+  - 最多 12 个文件。
+  - 单文件最多 24 KB。
+  - 总上下文最多 96 KB。
+  - 路径必须位于项目根目录内。
+- CLI stdout / stderr 实时回传到会话。
+- 全局并发和 provider 级并发调度。
 
-核心升级点：从“文件展示”升级为“上下文输入源”。
+## 配置
 
-目标链路：
+默认配置在 `config/providers.yaml`：
 
-```
-File Tree → Select Files → Read Content → Pack Context → Inject Prompt → CLI Agent
-```
-
-能力规划：
-
-- ✔ 支持文件级上下文选择
-- ✔ 支持目录级展开/过滤
-- ✔ token budget 控制（防止 prompt 爆炸）
-- ✔ ignore/include 规则（类似 .gitignore 思路）
-
----
-
-### 📦 2. Skills 工程化
-
-Skills 从“Markdown 片段”升级为“可组合工作流单元”。
-
-未来能力：
-
-- Skill chaining（技能链）
-- Skill 参数化（可配置 prompt 变量）
-- 团队级 Skill 共享库
-
----
-
-### 🧩 3. 从 CLI Launcher → Agent Workbench
-
-系统定位升级：
-
-| 阶段 | 定位 |
-|------|------|
-| v0 | CLI 启动器 |
-| v1 | Agent 面板 |
-| v2 | Agent Workbench |
-
-当前已接近 v2。
-
----
-
-## 🧠 核心能力
-
-- 项目级会话管理（Project / Session）
-- 多 Agent Provider（opencode / cac / codeagent）
-- Skills 注入机制（Markdown 工作流）
-- 文件树上下文展示（升级为上下文源）
-- CLI stdout / stderr 实时流式回传
-- 并发调度器（全局 + Provider 级）
-- 本地持久化（state.json）
-- Tauri 桌面应用（单 exe）
-
----
-
-## 🚀 Roadmap（更清晰版本）
-
-### Phase 1：Context Pipeline（核心）
-
-- [ ] file selector → prompt packer
-- [ ] context compression
-- [ ] token estimation / trimming
-
-### Phase 2：Structured Output
-
-- [ ] CLI JSON parsing
-- [ ] diff / result / error 分离展示
-- [ ] UI diff viewer
-
-### Phase 3：Skill System 2.0
-
-- [ ] skill graph
-- [ ] parameterized skill
-- [ ] skill marketplace
-
----
-
-## 🧱 架构
-
-```
-React UI
-   ↓
-Tauri IPC
-   ↓
-Rust Orchestrator
-   ↓
-CLI Agents
+```yaml
+providers:
+  - id: opencode
+    label: OpenCode
+    command: opencode
+    args:
+      - run
+      - "--format"
+      - json
+    concurrency: 2
+    cwd: "."
+    inputMode: arg
+    shell: true
+    env: {}
+defaults:
+  providerId: opencode
+  maxGlobalConcurrency: 3
+  workspaceRoot: ".."
+  skillsRoot: "skills"
 ```
 
----
+应用右侧 Agent 面板也可以直接修改命令、参数、并发和 prompt 传入方式，并保存回 `providers.yaml`。
 
-## 🎯 项目定位
+## 开发
 
-> 不是 CLI 工具的 UI wrapper，而是“面向代码执行的 Agent 操作系统”。
+```bash
+npm install
+npm run dev
+```
 
----
+## 构建 Windows exe
 
-下一步关键不是 UI，而是：
+```bash
+npm run dist:win
+```
 
-👉 **Context Engineering（上下文工程）**
+构建输出：
+
+```text
+src-tauri/target/release/intra-codex.exe
+```
+
+本仓库也会把最新可运行 exe 复制到：
+
+```text
+artifacts/intra-codex.exe
+```
+
+## 项目结构
+
+```text
+src/                 React UI
+src-tauri/src/       Rust runtime, scheduler, CLI bridge
+config/              Agent provider 配置
+skills/              Markdown skills
+docs/                设计文档
+artifacts/           可分发 exe 产物
+```

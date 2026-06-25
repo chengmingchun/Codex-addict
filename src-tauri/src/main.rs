@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod context;
+
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "windows")]
@@ -176,6 +178,7 @@ struct SendMessageRequest {
     agent_id: String,
     skill_ids: Vec<String>,
     content: String,
+    context_paths: Option<Vec<String>>,
 }
 
 struct Inner {
@@ -367,6 +370,11 @@ fn send_message(
             .iter_mut()
             .find(|session| session.id == request.session_id)
             .ok_or_else(|| "Session not found.".to_string())?;
+        let packed_content = context::pack_message_with_context(
+            &project.path,
+            &request.content,
+            request.context_paths.as_deref().unwrap_or(&[]),
+        );
         if session.title == "新会话" {
             session.title = request
                 .content
@@ -384,7 +392,7 @@ fn send_message(
         session.messages.push(Message {
             id: short_id(),
             role: "user".to_string(),
-            content: request.content.trim().to_string(),
+            content: packed_content.clone(),
             created_at: now(),
         });
         let run = AgentRun {
@@ -397,7 +405,7 @@ fn send_message(
             started_at: None,
             finished_at: None,
             exit_code: None,
-            input_tokens: rough_tokens(&request.content),
+            input_tokens: rough_tokens(&packed_content),
             output_tokens: 0,
         };
         session.run_ids.push(run.id.clone());

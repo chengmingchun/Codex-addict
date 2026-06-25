@@ -621,7 +621,8 @@ textarea {
 
 .projectFilesGroup {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
 }
 
 .agentPool,
@@ -747,7 +748,7 @@ textarea {
 .fileTreeRootButton,
 .fileNodeButton {
   display: grid;
-  grid-template-columns: 14px 16px minmax(0, 1fr);
+  grid-template-columns: 14px 16px minmax(0, 1fr) 16px;
   align-items: center;
   gap: 7px;
   width: 100%;
@@ -766,13 +767,22 @@ textarea {
 }
 
 .fileTreeRootButton {
+  grid-template-columns: 14px 16px minmax(0, 1fr);
+}
+
+.fileTreeRootButton {
   color: var(--text);
   font-weight: 700;
 }
 
 .fileNodeButton:hover,
-.fileTreeRootButton:hover {
+.fileTreeRootButton:hover,
+.fileNodeButton.active {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.fileNodeButton.active {
+  color: var(--accent);
 }
 
 .fileNodeButton span,
@@ -781,6 +791,13 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fileNodeButton input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .fileSpacer {
@@ -812,6 +829,14 @@ textarea {
   min-width: 36px;
   width: 36px;
   padding: 0;
+}
+
+.clearContextButton {
+  justify-self: start;
+  height: 30px;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 1080px) {

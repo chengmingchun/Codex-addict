@@ -1,10 +1,17 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 const MAX_CONTEXT_FILES: usize = 12;
 const MAX_CONTEXT_BYTES_PER_FILE: usize = 24 * 1024;
 const MAX_CONTEXT_BYTES_TOTAL: usize = 96 * 1024;
 
-pub fn pack_message_with_context(project_path: &str, content: &str, context_paths: &[String]) -> String {
+pub fn pack_message_with_context(
+    project_path: &str,
+    content: &str,
+    context_paths: &[String],
+) -> String {
     if context_paths.is_empty() {
         return content.trim().to_string();
     }
@@ -30,7 +37,11 @@ fn pack_context_files(project_path: &str, context_paths: &[String]) -> String {
         }
 
         let candidate = PathBuf::from(raw_path);
-        let candidate = if candidate.is_absolute() { candidate } else { root.join(candidate) };
+        let candidate = if candidate.is_absolute() {
+            candidate
+        } else {
+            root.join(candidate)
+        };
         let path = normalize_path(candidate);
 
         if !path.starts_with(&root) {
@@ -38,7 +49,10 @@ fn pack_context_files(project_path: &str, context_paths: &[String]) -> String {
             continue;
         }
         if !path.is_file() {
-            parts.push(format!("Skipped `{}`: not a readable file.", relative_path(&root, &path)));
+            parts.push(format!(
+                "Skipped `{}`: not a readable file.",
+                relative_path(&root, &path)
+            ));
             continue;
         }
 
@@ -58,11 +72,19 @@ fn pack_context_files(project_path: &str, context_paths: &[String]) -> String {
                 let rel = relative_path(&root, &path);
                 parts.push(format!(
                     "## File: `{rel}`\n{}\n```\n{}\n```",
-                    if truncated { "_Truncated by context budget._" } else { "" },
+                    if truncated {
+                        "_Truncated by context budget._"
+                    } else {
+                        ""
+                    },
                     body
                 ));
             }
-            Err(error) => parts.push(format!("Skipped `{}`: {}.", relative_path(&root, &path), error)),
+            Err(error) => parts.push(format!(
+                "Skipped `{}`: {}.",
+                relative_path(&root, &path),
+                error
+            )),
         }
     }
 
