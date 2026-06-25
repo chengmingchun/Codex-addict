@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod context;
+
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "windows")]
@@ -176,6 +178,7 @@ struct SendMessageRequest {
     agent_id: String,
     skill_ids: Vec<String>,
     content: String,
+    context_paths: Option<Vec<String>>,
 }
 
 struct Inner {
@@ -367,6 +370,11 @@ fn send_message(
             .iter_mut()
             .find(|session| session.id == request.session_id)
             .ok_or_else(|| "Session not found.".to_string())?;
+        let packed_content = context::pack_message_with_context(
+            &project.path,
+            &request.content,
+            request.context_paths.as_deref().unwrap_or(&[]),
+        );
         if session.title == "新会话" {
             session.title = request
                 .content
@@ -384,7 +392,7 @@ fn send_message(
         session.messages.push(Message {
             id: short_id(),
             role: "user".to_string(),
-            content: request.content.trim().to_string(),
+            content: packed_content.clone(),
             created_at: now(),
         });
         let run = AgentRun {
@@ -397,7 +405,7 @@ fn send_message(
             started_at: None,
             finished_at: None,
             exit_code: None,
-            input_tokens: rough_tokens(&request.content),
+            input_tokens: rough_tokens(&packed_content),
             output_tokens: 0,
         };
         session.run_ids.push(run.id.clone());
@@ -528,12 +536,7 @@ fn schedule(app: AppHandle, state: Arc<Mutex<Inner>>) {
                 &run.project_id,
                 &run.session_id,
                 "system",
-                format!(
-                    "Starting {}: {} {}",
-                    agent.label,
-                    agent.command,
-                    agent.args.join(" ")
-                ),
+                format!("Starting {}: {}", agent.label, command_preview(&agent)),
             );
 
             let project = inner.projects.get(&run.project_id).cloned();
@@ -589,6 +592,7 @@ fn start_run(
         if input_mode == "arg" {
             effective_args.push(prompt.clone());
         }
+        let transcript = Arc::new(Mutex::new(String::new()));
         let mut command = if agent.shell.unwrap_or(false) {
             shell_command(&agent, &effective_args)
         } else {
@@ -624,12 +628,26 @@ fn start_run(
                 let _ = stdin.write_all(prompt.as_bytes());
             }
         }
-        if let Some(stdout) = child.stdout.take() {
-            spawn_reader(app.clone(), state.clone(), run.clone(), "assistant", stdout);
-        }
-        if let Some(stderr) = child.stderr.take() {
-            spawn_reader(app.clone(), state.clone(), run.clone(), "tool", stderr);
-        }
+        let stdout_reader = child.stdout.take().map(|stdout| {
+            spawn_reader(
+                app.clone(),
+                state.clone(),
+                run.clone(),
+                "assistant",
+                stdout,
+                transcript.clone(),
+            )
+        });
+        let stderr_reader = child.stderr.take().map(|stderr| {
+            spawn_reader(
+                app.clone(),
+                state.clone(),
+                run.clone(),
+                "tool",
+                stderr,
+                transcript.clone(),
+            )
+        });
 
         let child_ref = Arc::new(Mutex::new(child));
         if let Ok(mut inner) = state.lock() {
@@ -650,19 +668,38 @@ fn start_run(
                 Err(_) => break None,
             }
         };
+        if let Some(reader) = stdout_reader {
+            let _ = reader.join();
+        }
+        if let Some(reader) = stderr_reader {
+            let _ = reader.join();
+        }
 
-        let final_status = if exit_code == Some(0) {
+        let transcript = transcript
+            .lock()
+            .map(|value| value.clone())
+            .unwrap_or_default();
+        let cli_error = contains_cli_error(&transcript);
+        let final_status = if exit_code == Some(0) && !cli_error {
             RunStatus::Done
         } else {
             RunStatus::Failed
         };
         finish_run(&app, &state, &run.id, final_status, exit_code);
+        let exit_note = if cli_error {
+            format!(
+                "Exited with code {:?}. Detected an error in CLI output.",
+                exit_code
+            )
+        } else {
+            format!("Exited with code {:?}.", exit_code)
+        };
         append_output(
             &app,
             &state,
             &run,
             "system",
-            format!("Exited with code {:?}.", exit_code),
+            exit_note,
         );
         if let Ok(mut inner) = state.lock() {
             inner.children.remove(&run.id);
@@ -677,7 +714,8 @@ fn spawn_reader<R: Read + Send + 'static>(
     run: AgentRun,
     role: &'static str,
     mut reader: R,
-) {
+    transcript: Arc<Mutex<String>>,
+) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut buffer = [0; 1024];
         loop {
@@ -685,12 +723,15 @@ fn spawn_reader<R: Read + Send + 'static>(
                 Ok(0) => break,
                 Ok(size) => {
                     let text = String::from_utf8_lossy(&buffer[..size]).to_string();
+                    if let Ok(mut output) = transcript.lock() {
+                        output.push_str(&text);
+                    }
                     append_output(&app, &state, &run, role, text);
                 }
                 Err(_) => break,
             }
         }
-    });
+    })
 }
 
 fn append_output<T: Into<String>>(
@@ -959,6 +1000,48 @@ fn make_usage(inner: &Inner) -> UsageSnapshot {
         tokens_used,
         provider_load,
     }
+}
+
+fn command_preview(agent: &AgentConfig) -> String {
+    let mut args = agent.args.clone();
+    match agent.input_mode.as_deref().unwrap_or("stdin") {
+        "arg" => args.push("<prompt>".to_string()),
+        "stdin" => args.push("<prompt via stdin>".to_string()),
+        _ => {}
+    }
+    std::iter::once(agent.command.clone())
+        .chain(args)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn contains_cli_error(output: &str) -> bool {
+    let cleaned = strip_ansi(output).to_lowercase();
+    cleaned.contains("error:")
+        || cleaned.contains("does not have a valid codingplan")
+        || cleaned.contains("subscription has expired")
+        || cleaned.contains("could not auto-migrate")
+        || cleaned.contains("authentication failed")
+        || cleaned.contains("permission denied")
+        || cleaned.contains("rate limit")
+}
+
+fn strip_ansi(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' && chars.peek() == Some(&'[') {
+            chars.next();
+            for next in chars.by_ref() {
+                if next.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(ch);
+    }
+    output
 }
 
 fn shell_command(provider: &AgentConfig, args: &[String]) -> Command {

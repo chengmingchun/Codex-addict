@@ -33,7 +33,7 @@ export async function createSession(request: { projectId: string; agentId: strin
   return invoke<Session>("create_session", { request });
 }
 
-export async function sendMessage(request: { projectId: string; sessionId: string; agentId: string; skillIds: string[]; content: string }) {
+export async function sendMessage(request: { projectId: string; sessionId: string; agentId: string; skillIds: string[]; content: string; contextPaths?: string[] }) {
   return invoke<AgentRun>("send_message", { request });
 }
 
