@@ -3,6 +3,7 @@
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "Segoe UI", sans-serif;
+  font-size: 14px;
   --bg: #111213;
   --window: #171819;
   --sidebar: rgba(28, 29, 31, 0.86);
@@ -19,6 +20,7 @@
   --warning: #ffd166;
   --danger: #ff6b81;
   --shadow: rgba(0, 0, 0, 0.22);
+  --soft-shadow: rgba(0, 0, 0, 0.12);
   background: var(--bg);
   color: var(--text);
 }
@@ -41,6 +43,7 @@
   --warning: #a36a00;
   --danger: #d33d55;
   --shadow: rgba(24, 31, 42, 0.08);
+  --soft-shadow: rgba(24, 31, 42, 0.05);
 }
 
 * {
@@ -59,9 +62,11 @@ body {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 34%),
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%),
     linear-gradient(180deg, var(--window), var(--bg));
   color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 button,
@@ -90,7 +95,7 @@ button:disabled {
 
 .appShell {
   display: grid;
-  grid-template-columns: minmax(196px, 248px) minmax(0, 1fr) minmax(250px, 320px);
+  grid-template-columns: minmax(212px, 260px) minmax(0, 1fr) minmax(276px, 340px);
   width: 100vw;
   height: 100vh;
   min-width: 0;
@@ -113,9 +118,9 @@ button:disabled {
 .contextPane {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 14px;
   overflow: hidden;
-  padding: 14px;
+  padding: 16px;
   border-left: 1px solid var(--line);
 }
 
@@ -123,8 +128,8 @@ button:disabled {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
-  gap: 11px;
-  padding: 18px 16px 14px;
+  gap: 12px;
+  padding: 20px 17px 16px;
 }
 
 .brandMark,
@@ -140,7 +145,7 @@ button:disabled {
 .brandMark {
   width: 36px;
   height: 36px;
-  border-radius: 12px;
+  border-radius: 11px;
 }
 
 .iconButton {
@@ -172,7 +177,7 @@ button:disabled {
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -181,8 +186,8 @@ button:disabled {
 .textInput {
   width: 100%;
   min-width: 0;
-  height: 34px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 11px;
   border: 1px solid var(--line);
   border-radius: 10px;
   outline: 0;
@@ -199,8 +204,8 @@ button:disabled {
 .sidebarActions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  padding: 0 12px 14px;
+  gap: 9px;
+  padding: 0 14px 16px;
 }
 
 .openProjectButton,
@@ -225,7 +230,7 @@ button:disabled {
   gap: 8px;
   min-width: 0;
   height: 36px;
-  padding: 0 11px;
+  padding: 0 12px;
   overflow: hidden;
   background: var(--panel);
   color: var(--accent);
@@ -236,13 +241,13 @@ button:disabled {
 .navSection {
   min-height: 0;
   overflow: auto;
-  padding: 0 10px 14px;
+  padding: 0 12px 16px;
 }
 
 .sectionLabel {
-  padding: 0 8px 8px;
+  padding: 0 8px 9px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -259,9 +264,9 @@ button:disabled {
   gap: 8px;
   align-items: center;
   width: 100%;
-  height: 36px;
-  margin-bottom: 6px;
-  padding: 0 10px;
+  height: 38px;
+  margin-bottom: 7px;
+  padding: 0 11px;
   background: transparent;
   text-align: left;
 }
@@ -275,7 +280,7 @@ button:disabled {
 
 .sessionsNav {
   border-top: 1px solid var(--line);
-  padding-top: 14px;
+  padding-top: 16px;
 }
 
 .sessionItem {
@@ -283,9 +288,9 @@ button:disabled {
   grid-template-columns: 12px minmax(0, 1fr);
   gap: 9px;
   width: 100%;
-  min-height: 56px;
-  margin-bottom: 8px;
-  padding: 9px 10px;
+  min-height: 60px;
+  margin-bottom: 9px;
+  padding: 10px 11px;
   background: transparent;
   text-align: left;
 }
@@ -323,8 +328,12 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
-  align-items: start;
-  padding: 18px 22px 12px;
+  align-items: center;
+  min-height: 78px;
+  padding: 12px 22px 11px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 45%, transparent);
+  backdrop-filter: blur(18px);
 }
 
 .eyebrow {
@@ -336,10 +345,11 @@ button:disabled {
 
 h1 {
   max-width: 100%;
-  margin: 4px 0;
+  margin: 2px 0 3px;
   overflow: hidden;
-  font-size: 24px;
-  line-height: 1.18;
+  font-size: 19px;
+  line-height: 1.24;
+  font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -349,7 +359,7 @@ h1 {
   margin: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -365,8 +375,8 @@ h1 {
   display: grid;
   grid-template-columns: auto auto;
   gap: 1px 7px;
-  min-width: 70px;
-  padding: 7px 9px;
+  min-width: 66px;
+  padding: 6px 9px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
@@ -389,7 +399,7 @@ h1 {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 0 22px 18px;
+  padding: 18px 24px 20px;
 }
 
 .threadEmpty {
@@ -408,12 +418,12 @@ h1 {
 
 .message {
   max-width: min(860px, 100%);
-  margin-bottom: 12px;
-  padding: 13px 15px;
+  margin-bottom: 14px;
+  padding: 15px 17px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 13px;
   background: var(--panel);
-  box-shadow: 0 8px 24px var(--shadow);
+  box-shadow: 0 8px 24px var(--soft-shadow);
 }
 
 .message.user {
@@ -431,9 +441,9 @@ h1 {
 }
 
 .message header {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -442,16 +452,18 @@ h1 {
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 .composer {
   min-width: 0;
-  margin: 0 22px 20px;
-  padding: 11px;
+  margin: 0 24px 22px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--panel);
-  box-shadow: 0 16px 38px var(--shadow);
+  box-shadow: 0 14px 34px var(--soft-shadow);
   backdrop-filter: blur(18px);
 }
 
@@ -459,9 +471,9 @@ h1 {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 2px 8px;
+  padding: 1px 2px 9px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .composerMeta span {
@@ -473,16 +485,17 @@ h1 {
 
 textarea {
   width: 100%;
-  min-height: 96px;
+  min-height: 106px;
   max-height: 34vh;
   resize: vertical;
-  padding: 12px;
+  padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: 13px;
   outline: 0;
   background: var(--field);
   color: var(--text);
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.62;
 }
 
 .composerFooter {
@@ -529,8 +542,9 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 2px 0 10px;
-  font-size: 14px;
+  margin: 1px 0 11px;
+  font-size: 13.5px;
+  font-weight: 760;
 }
 
 .agentCommandLine {
@@ -540,12 +554,12 @@ textarea {
   gap: 8px;
   min-width: 0;
   margin-top: 8px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: color-mix(in srgb, var(--panel-solid) 58%, transparent);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .compactChips {
@@ -555,7 +569,7 @@ textarea {
 .configDetails,
 .dropdownPanel {
   min-width: 0;
-  margin-top: 9px;
+  margin-top: 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: color-mix(in srgb, var(--panel-solid) 50%, transparent);
@@ -567,10 +581,10 @@ textarea {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 36px;
+  padding: 0 11px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   list-style: none;
   cursor: pointer;
@@ -587,8 +601,8 @@ textarea {
 
 .configForm {
   display: grid;
-  gap: 9px;
-  padding: 0 10px 10px;
+  gap: 10px;
+  padding: 0 11px 11px;
 }
 
 .fieldLabel {
@@ -596,7 +610,7 @@ textarea {
   gap: 5px;
   min-width: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -612,11 +626,11 @@ textarea {
 
 .contextGroup {
   min-height: 0;
-  padding: 12px;
+  padding: 13px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--panel);
-  box-shadow: 0 10px 28px var(--shadow);
+  box-shadow: 0 8px 22px var(--soft-shadow);
 }
 
 .projectFilesGroup {
@@ -654,12 +668,12 @@ textarea {
 
 .chips b {
   max-width: 100%;
-  padding: 2px 7px;
+  padding: 3px 8px;
   overflow: hidden;
   border-radius: 99px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 11px;
+  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -670,9 +684,9 @@ textarea {
   gap: 10px;
   align-items: center;
   margin-bottom: 10px;
-  padding: 11px;
+  padding: 11px 12px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--panel-solid) 62%, transparent);
 }
 
@@ -694,8 +708,8 @@ textarea {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 0 11px;
   overflow: hidden;
   background: transparent;
 }
@@ -723,13 +737,13 @@ textarea {
 
 .projectFilesHeader span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   white-space: nowrap;
 }
 
 .skillMenu {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   max-height: 190px;
   min-width: 0;
   overflow: auto;
@@ -739,7 +753,7 @@ textarea {
 .contextFileTree {
   min-height: 0;
   overflow: auto;
-  padding: 6px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: color-mix(in srgb, var(--field) 80%, transparent);
@@ -753,14 +767,14 @@ textarea {
   gap: 7px;
   width: 100%;
   min-width: 0;
-  min-height: 26px;
+  min-height: 30px;
   padding-right: 8px;
   overflow: hidden;
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -819,7 +833,7 @@ textarea {
   align-items: baseline;
   gap: 6px;
   min-width: 0;
-  padding: 12px;
+  padding: 13px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
@@ -841,7 +855,7 @@ textarea {
 
 @media (max-width: 1080px) {
   .appShell {
-    grid-template-columns: minmax(176px, 220px) minmax(0, 1fr) minmax(220px, 270px);
+    grid-template-columns: minmax(190px, 228px) minmax(0, 1fr) minmax(244px, 286px);
   }
 
   .brand {
@@ -854,7 +868,8 @@ textarea {
 
   .sessionHeader {
     grid-template-columns: minmax(0, 1fr);
-    padding: 16px 16px 10px;
+    min-height: 84px;
+    padding: 12px 18px 11px;
   }
 
   .headerActions {
@@ -862,11 +877,11 @@ textarea {
   }
 
   .thread {
-    padding: 0 16px 16px;
+    padding: 16px 18px 18px;
   }
 
   .composer {
-    margin: 0 16px 16px;
+    margin: 0 18px 18px;
   }
 
   .contextPane {
