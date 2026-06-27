@@ -1,4 +1,5 @@
 import React from "react";
+import "./markdown.css";
 
 type Segment =
   | { type: "code"; lang: string; content: string }
