@@ -37,6 +37,7 @@ import {
   subscribeToUpdates,
   updateAgentConfig
 } from "./api";
+import { MarkdownMessage } from "./MarkdownMessage";
 import type { AgentConfig, FileNode, ServerSnapshot } from "./types";
 import "./styles.css";
 
@@ -45,6 +46,8 @@ type AgentDraft = Pick<AgentConfig, "command" | "concurrency"> & {
   args: string;
   inputMode: NonNullable<AgentConfig["inputMode"]>;
 };
+
+const DEFAULT_SKILLS = ["explore", "html-report"];
 
 const statusText: Record<string, string> = {
   queued: "排队",
@@ -59,18 +62,13 @@ function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | undefined>();
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [agentId, setAgentId] = useState("");
-  const [skillIds, setSkillIds] = useState<string[]>(["frontend"]);
+  const [skillIds, setSkillIds] = useState<string[]>(DEFAULT_SKILLS);
   const [draft, setDraft] = useState("");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("theme") as Theme) || "light");
   const [isSending, setIsSending] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [selectedContextPaths, setSelectedContextPaths] = useState<Set<string>>(new Set());
-  const [agentDraft, setAgentDraft] = useState<AgentDraft>({
-    command: "",
-    args: "",
-    concurrency: 1,
-    inputMode: "stdin"
-  });
+  const [agentDraft, setAgentDraft] = useState<AgentDraft>({ command: "", args: "", concurrency: 1, inputMode: "stdin" });
 
   const activeProject = useMemo(
     () => snapshot?.projects.find((project) => project.id === activeProjectId) ?? snapshot?.projects[0],
@@ -114,10 +112,7 @@ function App() {
         setSnapshot((current) => {
           if (!current) return current;
           const exists = current.runs.some((item) => item.id === run.id);
-          return {
-            ...current,
-            runs: exists ? current.runs.map((item) => (item.id === run.id ? run : item)) : [run, ...current.runs]
-          };
+          return { ...current, runs: exists ? current.runs.map((item) => (item.id === run.id ? run : item)) : [run, ...current.runs] };
         });
       },
       (session) => {
@@ -160,10 +155,7 @@ function App() {
       if (current.has(activeProject.path)) return current;
       const next = new Set(current);
       next.add(activeProject.path);
-      activeProject.files
-        .filter((node) => node.kind === "directory")
-        .slice(0, 8)
-        .forEach((node) => next.add(node.path));
+      activeProject.files.filter((node) => node.kind === "directory").slice(0, 8).forEach((node) => next.add(node.path));
       return next;
     });
     setSelectedContextPaths((current) => new Set(Array.from(current).filter((path) => path.startsWith(activeProject.path))));
@@ -178,9 +170,12 @@ function App() {
     if (!picked) return;
     const project = await openProject(picked);
     const next = await loadSnapshot();
-    setSnapshot(next);
+    const providerId = agentId || next.config.defaults.providerId;
+    const session = await createSession({ projectId: project.id, agentId: providerId, skillIds, title: "新会话" });
+    setSnapshot(await loadSnapshot());
     setActiveProjectId(project.id);
-    setActiveSessionId(project.sessions[0]?.id);
+    setActiveSessionId(session.id);
+    setAgentId(providerId);
     setSelectedContextPaths(new Set());
   }
 
@@ -192,7 +187,7 @@ function App() {
   }
 
   async function submit() {
-    if (!activeProject || !activeSession || !draft.trim()) return;
+    if (!activeProject || !activeSession || !draft.trim() || isSending) return;
     setIsSending(true);
     try {
       await sendMessage({
@@ -207,6 +202,13 @@ function App() {
       setSnapshot(await loadSnapshot());
     } finally {
       setIsSending(false);
+    }
+  }
+
+  function submitByShortcut(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      void submit();
     }
   }
 
@@ -272,67 +274,33 @@ function App() {
     <main className="appShell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brandMark">
-            <Bot size={23} />
-          </div>
-          <div>
-            <strong>Intra Codex</strong>
-            <span>Agent Workbench</span>
-          </div>
+          <div className="brandMark"><Bot size={23} /></div>
+          <div><strong>Intra Codex</strong><span>Agent Workbench</span></div>
         </div>
 
         <div className="sidebarActions">
-          <button className="openProjectButton" onClick={chooseProject}>
-            <FolderOpen size={17} />
-            打开项目
-          </button>
-          <button className="iconButton" onClick={newSession} disabled={!activeProject} title="新建会话">
-            <MessageSquarePlus size={17} />
-          </button>
+          <button className="openProjectButton" onClick={chooseProject}><FolderOpen size={17} />打开项目</button>
+          <button className="iconButton" onClick={newSession} disabled={!activeProject} title="新建会话"><MessageSquarePlus size={17} /></button>
         </div>
 
         <section className="navSection">
           <div className="sectionLabel">Projects</div>
-          {snapshot.projects.length ? (
-            snapshot.projects.map((project) => (
-              <button
-                key={project.id}
-                className={`navProject ${project.id === activeProject?.id ? "active" : ""}`}
-                onClick={() => {
-                  setActiveProjectId(project.id);
-                  setActiveSessionId(project.sessions[0]?.id);
-                }}
-              >
-                <Folder size={15} />
-                <span>{project.name}</span>
-              </button>
-            ))
-          ) : (
-            <div className="sidebarEmpty">选择一个代码目录作为项目。</div>
-          )}
+          {snapshot.projects.length ? snapshot.projects.map((project) => (
+            <button key={project.id} className={`navProject ${project.id === activeProject?.id ? "active" : ""}`} onClick={() => { setActiveProjectId(project.id); setActiveSessionId(project.sessions[0]?.id); }}>
+              <Folder size={15} /><span>{project.name}</span>
+            </button>
+          )) : <div className="sidebarEmpty">选择一个代码目录作为项目。</div>}
         </section>
 
         <section className="navSection sessionsNav">
           <div className="sectionLabel">Sessions</div>
-          {activeProject?.sessions.length ? (
-            activeProject.sessions.map((session) => (
-              <button
-                key={session.id}
-                className={`sessionItem ${session.id === activeSession?.id ? "active" : ""}`}
-                onClick={() => setActiveSessionId(session.id)}
-              >
-                <span className={`statusDot ${session.status}`} />
-                <div>
-                  <strong>{session.title}</strong>
-                  <span>{statusText[session.status]} / {session.agentId}</span>
-                </div>
-              </button>
-            ))
-          ) : (
-            <button className="createFirstSession" onClick={newSession} disabled={!activeProject}>
-              <MessageSquarePlus size={16} />
-              新建会话
+          {activeProject?.sessions.length ? activeProject.sessions.map((session) => (
+            <button key={session.id} className={`sessionItem ${session.id === activeSession?.id ? "active" : ""}`} onClick={() => setActiveSessionId(session.id)}>
+              <span className={`statusDot ${session.status}`} />
+              <div><strong>{session.title}</strong><span>{statusText[session.status]} / {session.agentId}</span></div>
             </button>
+          )) : (
+            <button className="createFirstSession" onClick={newSession} disabled={!activeProject}><MessageSquarePlus size={16} />新建会话</button>
           )}
         </section>
       </aside>
@@ -342,68 +310,39 @@ function App() {
           <div>
             <span className="eyebrow">Project Session</span>
             <h1>{activeSession?.title || activeProject?.name || "打开项目开始"}</h1>
-            <p>{activeProject?.path || "把本地 agent CLI 组织成项目、会话、skills 和上下文工作流。"}</p>
+            <p>{activeProject?.path || "打开项目后会自动创建新会话，使用 Ctrl/⌘ + Enter 发送。"}</p>
           </div>
           <div className="headerActions">
             <Metric icon={<Activity size={16} />} label="运行" value={snapshot.usage.running.toString()} />
             <Metric icon={<Gauge size={16} />} label="排队" value={snapshot.usage.queued.toString()} />
-            <button className="iconButton" onClick={reloadEverything} title="重新加载配置">
-              <RefreshCw size={17} />
-            </button>
-            <button className="iconButton" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="切换浅色/深色">
-              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
+            <button className="iconButton" onClick={reloadEverything} title="重新加载配置"><RefreshCw size={17} /></button>
+            <button className="iconButton" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="切换浅色/深色">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
           </div>
         </header>
 
         <section className="thread">
-          {activeSession ? (
-            activeSession.messages.length ? (
-              activeSession.messages.map((message) => (
-                <article key={message.id} className={`message ${message.role}`}>
-                  <header>{roleLabel(message.role)}</header>
-                  <pre>{message.content}</pre>
-                </article>
-              ))
-            ) : (
-              <div className="threadEmpty">
-                <Sparkles size={28} />
-                <strong>这个会话还没有消息</strong>
-                <span>右侧选择 Agent、Skills 和上下文文件，然后从下方输入目标。</span>
-              </div>
-            )
+          {activeSession ? activeSession.messages.length ? activeSession.messages.map((message) => (
+            <article key={message.id} className={`message ${message.role}`}>
+              <header>{roleLabel(message.role)}</header>
+              {message.role === "system" && <div className="systemNotice">系统提示：运行状态或错误信息，不是 Agent 回复。</div>}
+              <MarkdownMessage content={message.content} />
+            </article>
+          )) : (
+            <div className="threadEmpty"><Sparkles size={28} /><strong>这个会话还没有消息</strong><span>右侧选择 Agent、Skills 和上下文文件，然后输入目标。Ctrl/⌘ + Enter 发送。</span></div>
           ) : (
-            <div className="threadEmpty">
-              <FolderOpen size={28} />
-              <strong>先打开项目，再创建会话</strong>
-              <span>项目会保留文件树、会话历史和 Agent 运行记录。</span>
-            </div>
+            <div className="threadEmpty"><FolderOpen size={28} /><strong>打开项目即可开始</strong><span>系统会自动创建一个新会话。</span></div>
           )}
         </section>
 
         <section className="composer">
-          <div className="composerMeta">
-            <span>{activeAgent ? activeAgent.label : "未选择 Agent"}</span>
-            <span>{skillIds.length} skills</span>
-            <span>{selectedContextList.length} context files</span>
-          </div>
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="像使用 Codex 一样，描述你希望当前项目会话继续完成什么..."
-          />
+          <div className="composerMeta"><span>{activeAgent ? activeAgent.label : "未选择 Agent"}</span><span>{skillIds.length} skills</span><span>{selectedContextList.length} context files</span></div>
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={submitByShortcut} placeholder="描述任务。Ctrl/⌘ + Enter 发送，Enter 换行。" />
           <div className="composerFooter">
             <span>{activeAgent ? `${activeAgent.command} ${activeAgent.args.join(" ")}` : "请选择右侧 Agent"}</span>
             {activeRun ? (
-              <button className="ghostButton" onClick={stopActiveRun}>
-                <CircleStop size={17} />
-                停止
-              </button>
+              <button className="ghostButton" onClick={stopActiveRun}><CircleStop size={17} />停止</button>
             ) : (
-              <button className="primaryButton" onClick={submit} disabled={!activeSession || !draft.trim() || isSending}>
-                <Send size={17} />
-                发送
-              </button>
+              <button className="primaryButton" onClick={submit} disabled={!activeSession || !draft.trim() || isSending}><Send size={17} />发送 <kbd>Ctrl↵</kbd></button>
             )}
           </div>
         </section>
@@ -413,213 +352,86 @@ function App() {
         <section className="contextGroup">
           <PanelTitle icon={<Cpu size={18} />} title="Agent" />
           <select className="selectControl" value={activeAgent?.id || ""} onChange={(event) => setAgentId(event.target.value)}>
-            {snapshot.config.providers.map((agent) => (
-              <option key={agent.id} value={agent.id}>{agent.label}</option>
-            ))}
+            {snapshot.config.providers.map((agent) => <option key={agent.id} value={agent.id}>{agent.label}</option>)}
           </select>
-          <div className="agentCommandLine">
-            <Terminal size={14} />
-            <span>{activeAgent ? `${activeAgent.command} ${activeAgent.args.join(" ")}` : "No agent selected"}</span>
-          </div>
+          <div className="agentCommandLine"><Terminal size={14} /><span>{activeAgent ? `${activeAgent.command} ${activeAgent.args.join(" ")}` : "No agent selected"}</span></div>
           <div className="chips compactChips">{(activeAgent?.capabilities || []).map((capability) => <b key={capability}>{capability}</b>)}</div>
           <details className="configDetails">
-            <summary>
-              <Settings2 size={15} />
-              调用配置
-            </summary>
+            <summary><Settings2 size={15} />调用配置</summary>
             <div className="configForm">
-              <label className="fieldLabel">
-                命令
-                <input className="textInput" value={agentDraft.command} onChange={(event) => setAgentDraft((current) => ({ ...current, command: event.target.value }))} />
-              </label>
-              <label className="fieldLabel">
-                参数
-                <input className="textInput" value={agentDraft.args} onChange={(event) => setAgentDraft((current) => ({ ...current, args: event.target.value }))} />
-              </label>
+              <label className="fieldLabel">命令<input className="textInput" value={agentDraft.command} onChange={(event) => setAgentDraft((current) => ({ ...current, command: event.target.value }))} /></label>
+              <label className="fieldLabel">参数<input className="textInput" value={agentDraft.args} onChange={(event) => setAgentDraft((current) => ({ ...current, args: event.target.value }))} /></label>
               <div className="formGrid">
-                <label className="fieldLabel">
-                  Prompt
-                  <select className="selectControl" value={agentDraft.inputMode} onChange={(event) => setAgentDraft((current) => ({ ...current, inputMode: event.target.value as AgentDraft["inputMode"] }))}>
-                    <option value="arg">位置参数</option>
-                    <option value="stdin">stdin</option>
-                    <option value="none">不传入</option>
-                  </select>
-                </label>
-                <label className="fieldLabel">
-                  并发
-                  <input className="textInput" type="number" min={1} max={8} value={agentDraft.concurrency} onChange={(event) => setAgentDraft((current) => ({ ...current, concurrency: Number(event.target.value) }))} />
-                </label>
+                <label className="fieldLabel">Prompt<select className="selectControl" value={agentDraft.inputMode} onChange={(event) => setAgentDraft((current) => ({ ...current, inputMode: event.target.value as AgentDraft["inputMode"] }))}><option value="arg">位置参数</option><option value="stdin">stdin</option><option value="none">不传入</option></select></label>
+                <label className="fieldLabel">并发<input className="textInput" type="number" min={1} max={8} value={agentDraft.concurrency} onChange={(event) => setAgentDraft((current) => ({ ...current, concurrency: Number(event.target.value) }))} /></label>
               </div>
-              <button className="secondaryButton saveConfigButton" onClick={saveAgentSettings}>
-                <Save size={15} />
-                保存到 providers.yaml
-              </button>
+              <button className="secondaryButton saveConfigButton" onClick={saveAgentSettings}><Save size={15} />保存到 providers.yaml</button>
             </div>
           </details>
         </section>
 
         <section className="contextGroup">
           <PanelTitle icon={<Sparkles size={18} />} title="Skills" />
-          <div className="pathConfig">
-            <div>
-              <strong>{snapshot.config.defaults.skillsRoot || "skills"}</strong>
-              <span>{snapshot.skills.length} skills loaded</span>
-            </div>
-            <button className="secondaryButton compact" onClick={chooseSkillsRoot} title="选择 skills 目录">
-              <FolderOpen size={16} />
-            </button>
-          </div>
-          <details className="dropdownPanel">
-            <summary>
-              <span>{skillIds.length ? `已选 ${skillIds.length} 个` : "未选择 skill"}</span>
-              <ChevronDown size={15} />
-            </summary>
+          <div className="pathConfig"><div><strong>{snapshot.config.defaults.skillsRoot || "skills"}</strong><span>{snapshot.skills.length} skills loaded</span></div><button className="secondaryButton compact" onClick={chooseSkillsRoot} title="选择 skills 目录"><FolderOpen size={16} /></button></div>
+          <details className="dropdownPanel" open>
+            <summary><span>{skillIds.length ? `已选 ${skillIds.length} 个` : "未选择 skill"}</span><ChevronDown size={15} /></summary>
             <div className="skillMenu">
-              {snapshot.skills.length ? (
-                snapshot.skills.map((skill) => (
-                  <label key={skill.id} className="checkRow">
-                    <input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} />
-                    <span><Check size={14} /> {skill.title}</span>
-                  </label>
-                ))
-              ) : (
-                <span className="mutedText">当前目录没有加载到 skill markdown</span>
-              )}
+              {snapshot.skills.length ? snapshot.skills.map((skill) => (
+                <label key={skill.id} className="checkRow"><input type="checkbox" checked={skillIds.includes(skill.id)} onChange={() => toggleSkill(skill.id, skillIds, setSkillIds)} /><span><Check size={14} /> {skill.title}</span></label>
+              )) : <span className="mutedText">当前目录没有加载到 skill markdown</span>}
             </div>
           </details>
         </section>
 
         <section className="contextGroup projectFilesGroup">
-          <div className="projectFilesHeader">
-            <PanelTitle icon={<PanelRight size={18} />} title="Project Files" />
-            {activeProject && <span>{selectedContextList.length ? `${selectedContextList.length} selected` : `${countFiles(activeProject.files)} items`}</span>}
-          </div>
-          {selectedContextList.length > 0 && (
-            <button className="secondaryButton clearContextButton" onClick={() => setSelectedContextPaths(new Set())}>
-              <X size={14} />
-              清空上下文
-            </button>
-          )}
+          <div className="projectFilesHeader"><PanelTitle icon={<PanelRight size={18} />} title="Project Files" />{activeProject && <span>{selectedContextList.length ? `${selectedContextList.length} selected` : `${countFiles(activeProject.files)} items`}</span>}</div>
+          {selectedContextList.length > 0 && <button className="secondaryButton clearContextButton" onClick={() => setSelectedContextPaths(new Set())}><X size={14} />清空上下文</button>}
           <div className="contextFileTree">
             {activeProject ? (
               <div className="fileTreeRoot">
-                <button className="fileTreeRootButton" onClick={() => togglePath(activeProject.path)}>
-                  {expandedPaths.has(activeProject.path) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  <Folder size={14} />
-                  <strong>{activeProject.name}</strong>
-                </button>
-                {expandedPaths.has(activeProject.path) && (
-                  <div className="fileChildren">
-                    {activeProject.files.map((node) => (
-                      <FileTreeNode
-                        key={node.path}
-                        node={node}
-                        depth={0}
-                        expandedPaths={expandedPaths}
-                        selectedContextPaths={selectedContextPaths}
-                        onToggle={togglePath}
-                        onToggleContext={toggleContextPath}
-                      />
-                    ))}
-                  </div>
-                )}
+                <button className="fileTreeRootButton" onClick={() => togglePath(activeProject.path)}>{expandedPaths.has(activeProject.path) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<Folder size={14} /><strong>{activeProject.name}</strong></button>
+                {expandedPaths.has(activeProject.path) && <div className="fileChildren">{activeProject.files.map((node) => <FileTreeNode key={node.path} node={node} depth={0} expandedPaths={expandedPaths} selectedContextPaths={selectedContextPaths} onToggle={togglePath} onToggleContext={toggleContextPath} />)}</div>}
               </div>
-            ) : (
-              <span className="mutedText">打开项目后显示文件树</span>
-            )}
+            ) : <span className="mutedText">打开项目后显示文件树</span>}
           </div>
         </section>
 
-        <section className="contextGroup">
-          <PanelTitle icon={<Zap size={18} />} title="Usage" />
-          <div className="usageCompact">
-            <strong>{snapshot.usage.tokensUsed.toLocaleString()}</strong>
-            <span>/ {snapshot.usage.tokenBudget.toLocaleString()} tokens</span>
-          </div>
-        </section>
+        <section className="contextGroup"><PanelTitle icon={<Zap size={18} />} title="Usage" /><div className="usageCompact"><strong>{snapshot.usage.tokensUsed.toLocaleString()}</strong><span>/ {snapshot.usage.tokenBudget.toLocaleString()} tokens</span></div></section>
       </aside>
     </main>
   );
 }
 
-function FileTreeNode({
-  node,
-  depth,
-  expandedPaths,
-  selectedContextPaths,
-  onToggle,
-  onToggleContext
-}: {
-  node: FileNode;
-  depth: number;
-  expandedPaths: Set<string>;
-  selectedContextPaths: Set<string>;
-  onToggle: (path: string) => void;
-  onToggleContext: (path: string, checked?: boolean) => void;
-}) {
+function FileTreeNode({ node, depth, expandedPaths, selectedContextPaths, onToggle, onToggleContext }: { node: FileNode; depth: number; expandedPaths: Set<string>; selectedContextPaths: Set<string>; onToggle: (path: string) => void; onToggleContext: (path: string, checked?: boolean) => void }) {
   const isDirectory = node.kind === "directory";
   const isExpanded = expandedPaths.has(node.path);
   const isSelected = selectedContextPaths.has(node.path);
   return (
     <div className="fileNode">
-      <button
-        className={`fileNodeButton ${isSelected ? "active" : ""}`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        title={node.path}
-        onClick={() => (isDirectory ? onToggle(node.path) : onToggleContext(node.path))}
-      >
+      <button className={`fileNodeButton ${isSelected ? "active" : ""}`} style={{ paddingLeft: `${depth * 12 + 8}px` }} title={node.path} onClick={() => (isDirectory ? onToggle(node.path) : onToggleContext(node.path))}>
         {isDirectory ? isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="fileSpacer" />}
         {isDirectory ? <Folder size={14} /> : <File size={14} />}
         <span>{node.name}</span>
-        {!isDirectory && (
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onClick={(event) => event.stopPropagation()}
-            onChange={(event) => onToggleContext(node.path, event.currentTarget.checked)}
-            aria-label={`选择 ${node.name} 作为上下文`}
-          />
-        )}
+        {!isDirectory && <input type="checkbox" checked={isSelected} onClick={(event) => event.stopPropagation()} onChange={(event) => onToggleContext(node.path, event.currentTarget.checked)} aria-label={`选择 ${node.name} 作为上下文`} />}
       </button>
-      {isDirectory && isExpanded && node.children.map((child) => (
-        <FileTreeNode
-          key={child.path}
-          node={child}
-          depth={depth + 1}
-          expandedPaths={expandedPaths}
-          selectedContextPaths={selectedContextPaths}
-          onToggle={onToggle}
-          onToggleContext={onToggleContext}
-        />
-      ))}
+      {isDirectory && isExpanded && node.children.map((child) => <FileTreeNode key={child.path} node={child} depth={depth + 1} expandedPaths={expandedPaths} selectedContextPaths={selectedContextPaths} onToggle={onToggle} onToggleContext={onToggleContext} />)}
     </div>
   );
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="metric">
-      {icon}
-      <span>{label}</span>
-      <b>{value}</b>
-    </div>
-  );
+  return <div className="metric">{icon}<span>{label}</span><b>{value}</b></div>;
 }
 
 function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <h2 className="panelTitle">
-      {icon}
-      {title}
-    </h2>
-  );
+  return <h2 className="panelTitle">{icon}{title}</h2>;
 }
 
 function roleLabel(role: string) {
-  if (role === "user") return "You";
-  if (role === "assistant") return "Agent";
-  if (role === "tool") return "CLI";
-  return "System";
+  if (role === "user") return "用户输入";
+  if (role === "assistant") return "Agent 回复";
+  if (role === "tool") return "CLI 输出";
+  return "系统提示";
 }
 
 function toggleSkill(skillId: string, skillIds: string[], setSkillIds: React.Dispatch<React.SetStateAction<string[]>>) {
