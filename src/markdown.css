@@ -1,0 +1,167 @@
+.message {
+  font-weight: 650;
+}
+
+.message header {
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.systemNotice {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.markdownMessage {
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.78;
+  overflow-wrap: anywhere;
+}
+
+.markdownMessage > *:first-child {
+  margin-top: 0;
+}
+
+.markdownMessage > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdownMessage p {
+  margin: 0 0 10px;
+}
+
+.markdownMessage h2,
+.markdownMessage h3,
+.markdownMessage h4,
+.markdownMessage h5 {
+  margin: 14px 0 8px;
+  color: var(--text);
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.markdownMessage h2 {
+  font-size: 18px;
+}
+
+.markdownMessage h3 {
+  font-size: 16px;
+}
+
+.markdownMessage h4,
+.markdownMessage h5 {
+  font-size: 15px;
+}
+
+.markdownMessage ul,
+.markdownMessage ol {
+  margin: 0 0 10px 22px;
+  padding: 0;
+}
+
+.markdownMessage li {
+  margin: 4px 0;
+  padding-left: 2px;
+}
+
+.markdownMessage blockquote {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.markdownMessage code {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--field) 85%, transparent);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, ui-monospace, monospace;
+  font-size: 0.92em;
+  font-weight: 700;
+}
+
+.markdownCodeBlock {
+  margin: 10px 0 13px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--field) 88%, transparent);
+}
+
+.markdownCodeBlock figcaption {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.markdownCodeBlock pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.markdownCodeBlock code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.8px;
+  line-height: 1.65;
+}
+
+.markdownTableWrap {
+  max-width: 100%;
+  margin: 10px 0 13px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.markdownTableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.markdownTableWrap th,
+.markdownTableWrap td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdownTableWrap th {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 850;
+}
+
+.markdownTableWrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.primaryButton kbd {
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.13);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 850;
+}
