@@ -1,0 +1,411 @@
+<style>
+.intra-codex-wiki {
+  --ic-bg: #0f1117;
+  --ic-panel: rgba(255, 255, 255, 0.075);
+  --ic-panel-strong: rgba(255, 255, 255, 0.12);
+  --ic-line: rgba(255, 255, 255, 0.16);
+  --ic-text: #f7f8fb;
+  --ic-muted: #aab1c0;
+  --ic-accent: #6aa7ff;
+  --ic-accent-2: #8ef0c4;
+  --ic-warning: #ffd166;
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(106, 167, 255, 0.28), transparent 26%),
+    radial-gradient(circle at 84% 12%, rgba(142, 240, 196, 0.18), transparent 24%),
+    linear-gradient(135deg, #111725, var(--ic-bg));
+  color: var(--ic-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  line-height: 1.7;
+}
+
+.intra-codex-wiki * {
+  box-sizing: border-box;
+}
+
+.intra-codex-wiki .glow-orb {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(106, 167, 255, 0.28), transparent 64%);
+  filter: blur(12px);
+  animation: ic-float 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.intra-codex-wiki .glow-orb.two {
+  right: -80px;
+  bottom: -110px;
+  background: radial-gradient(circle, rgba(142, 240, 196, 0.2), transparent 64%);
+  animation-delay: -3s;
+}
+
+.intra-codex-wiki .hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  gap: 22px;
+  align-items: stretch;
+  z-index: 1;
+}
+
+.intra-codex-wiki .hero-main,
+.intra-codex-wiki .hero-side,
+.intra-codex-wiki .card,
+.intra-codex-wiki .flow-step,
+.intra-codex-wiki .skill-card {
+  border: 1px solid var(--ic-line);
+  background: var(--ic-panel);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+}
+
+.intra-codex-wiki .hero-main {
+  padding: 28px;
+  border-radius: 24px;
+}
+
+.intra-codex-wiki .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 6px 11px;
+  border: 1px solid rgba(106, 167, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(106, 167, 255, 0.12);
+  color: var(--ic-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.intra-codex-wiki .pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ic-accent-2);
+  box-shadow: 0 0 0 0 rgba(142, 240, 196, 0.55);
+  animation: ic-pulse 1.8s ease-out infinite;
+}
+
+.intra-codex-wiki .title {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1.05;
+  letter-spacing: -0.055em;
+}
+
+.intra-codex-wiki .title span {
+  background: linear-gradient(90deg, #ffffff, var(--ic-accent), var(--ic-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.intra-codex-wiki .subtitle {
+  max-width: 760px;
+  margin: 18px 0 0;
+  color: var(--ic-muted);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.intra-codex-wiki .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.intra-codex-wiki .pill {
+  padding: 9px 13px;
+  border: 1px solid var(--ic-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ic-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.intra-codex-wiki .hero-side {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 24px;
+}
+
+.intra-codex-wiki .terminal {
+  border: 1px solid var(--ic-line);
+  border-radius: 18px;
+  background: rgba(2, 8, 20, 0.68);
+  overflow: hidden;
+}
+
+.intra-codex-wiki .terminal-bar {
+  display: flex;
+  gap: 7px;
+  padding: 12px;
+  border-bottom: 1px solid var(--ic-line);
+}
+
+.intra-codex-wiki .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff5f57;
+}
+
+.intra-codex-wiki .dot.yellow { background: #ffbd2e; }
+.intra-codex-wiki .dot.green { background: #28c840; }
+
+.intra-codex-wiki .terminal-body {
+  padding: 16px;
+  color: #d8e5ff;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.intra-codex-wiki .terminal-line {
+  margin: 0 0 10px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: ic-line-in 0.55s ease forwards;
+}
+
+.intra-codex-wiki .terminal-line:nth-child(2) { animation-delay: 0.25s; }
+.intra-codex-wiki .terminal-line:nth-child(3) { animation-delay: 0.5s; }
+.intra-codex-wiki .terminal-line:nth-child(4) { animation-delay: 0.75s; }
+.intra-codex-wiki .terminal-line:nth-child(5) { animation-delay: 1s; }
+
+.intra-codex-wiki .section-title {
+  position: relative;
+  margin: 34px 0 16px;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  z-index: 1;
+}
+
+.intra-codex-wiki .grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.intra-codex-wiki .card,
+.intra-codex-wiki .skill-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 20px;
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.intra-codex-wiki .card:hover,
+.intra-codex-wiki .skill-card:hover,
+.intra-codex-wiki .flow-step:hover {
+  transform: translateY(-4px);
+  border-color: rgba(106, 167, 255, 0.48);
+  background: var(--ic-panel-strong);
+}
+
+.intra-codex-wiki .card::after,
+.intra-codex-wiki .skill-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.18) 42%, transparent 60%);
+  transform: translateX(-120%);
+  animation: ic-shine 5.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.intra-codex-wiki .card h3,
+.intra-codex-wiki .skill-card h3,
+.intra-codex-wiki .flow-step h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.intra-codex-wiki .card p,
+.intra-codex-wiki .skill-card p,
+.intra-codex-wiki .flow-step p {
+  margin: 0;
+  color: var(--ic-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.intra-codex-wiki .badge {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(142, 240, 196, 0.12);
+  color: var(--ic-accent-2);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.intra-codex-wiki .flow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.intra-codex-wiki .flow-step {
+  position: relative;
+  min-height: 126px;
+  padding: 16px;
+  border-radius: 18px;
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.intra-codex-wiki .step-number {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--ic-accent), var(--ic-accent-2));
+  color: #07111f;
+  font-weight: 950;
+}
+
+.intra-codex-wiki .wiki-note {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 209, 102, 0.34);
+  border-radius: 18px;
+  background: rgba(255, 209, 102, 0.1);
+  color: #ffe3a3;
+  font-weight: 750;
+}
+
+@keyframes ic-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(24px, -18px, 0) scale(1.08); }
+}
+
+@keyframes ic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(142, 240, 196, 0.55); }
+  100% { box-shadow: 0 0 0 14px rgba(142, 240, 196, 0); }
+}
+
+@keyframes ic-line-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ic-shine {
+  0%, 48% { transform: translateX(-120%); }
+  68%, 100% { transform: translateX(120%); }
+}
+
+@media (max-width: 980px) {
+  .intra-codex-wiki .hero,
+  .intra-codex-wiki .grid,
+  .intra-codex-wiki .flow {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<div class="intra-codex-wiki">
+  <div class="glow-orb"></div>
+  <div class="glow-orb two"></div>
+
+  <div class="hero">
+    <div class="hero-main">
+      <div class="eyebrow"><span class="pulse-dot"></span> Intra Codex / Agent Workbench</div>
+      <h1 class="title">把内网 CLI Agent<br><span>组织成可沉淀的研发工作台</span></h1>
+      <p class="subtitle">Intra Codex 不是替代现有 Agent，而是把 opencode、cac、codeagent 等命令行能力统一收束到项目、会话、Skills、上下文文件和运行记录里，让 AI 辅助研发变得可复用、可追踪、可交付。</p>
+      <div class="hero-actions">
+        <div class="pill">项目级会话</div>
+        <div class="pill">Skills 注入</div>
+        <div class="pill">上下文文件选择</div>
+        <div class="pill">离线 Markdown 渲染</div>
+        <div class="pill">Windows EXE 分发</div>
+      </div>
+    </div>
+
+    <div class="hero-side">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="dot"></div><div class="dot yellow"></div><div class="dot green"></div>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-line">$ open project ./service-console</div>
+          <div class="terminal-line">✓ auto create session</div>
+          <div class="terminal-line">✓ load skills: explore, html-report</div>
+          <div class="terminal-line">✓ select context files</div>
+          <div class="terminal-line">→ Ctrl + Enter to run agent</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">它解决什么问题？</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="badge">Context</div>
+      <h3>上下文不再散落</h3>
+      <p>围绕项目目录组织文件树、会话历史和上下文选择，减少每次都要重新解释项目背景的成本。</p>
+    </div>
+    <div class="card">
+      <div class="badge">Workflow</div>
+      <h3>Skills 变成工作流资产</h3>
+      <p>把探索项目、输出 HTML 报告等固定流程沉淀为 Skill，让团队成员按同一标准使用 Agent。</p>
+    </div>
+    <div class="card">
+      <div class="badge">Delivery</div>
+      <h3>结果适合内网沉淀</h3>
+      <p>Markdown 本地渲染，HTML 报告不依赖 CDN 和在线引擎，适合复制到内网 Wiki。</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">推荐使用流程</h2>
+  <div class="flow">
+    <div class="flow-step"><div class="step-number">1</div><h3>打开项目</h3><p>选择本地代码目录，应用自动读取文件树。</p></div>
+    <div class="flow-step"><div class="step-number">2</div><h3>自动建会话</h3><p>无需手动创建 Session，打开项目后直接进入新会话。</p></div>
+    <div class="flow-step"><div class="step-number">3</div><h3>选择 Skills</h3><p>默认使用探索项目和 HTML 探索报告两个 Skill。</p></div>
+    <div class="flow-step"><div class="step-number">4</div><h3>勾选上下文</h3><p>选择 README、配置、入口和核心 service 等关键文件。</p></div>
+    <div class="flow-step"><div class="step-number">5</div><h3>运行 Agent</h3><p>输入任务后使用 Ctrl/⌘ + Enter 发送。</p></div>
+  </div>
+
+  <h2 class="section-title">默认 Skills</h2>
+  <div class="grid">
+    <div class="skill-card">
+      <div class="badge">Skill 01</div>
+      <h3>探索项目</h3>
+      <p>先理解项目定位、模块地图、核心链路、关键文件和风险点，再给出下一步建议。</p>
+    </div>
+    <div class="skill-card">
+      <div class="badge">Skill 02</div>
+      <h3>HTML 探索报告</h3>
+      <p>把探索结果整理成可离线打开、适合粘贴到 Wiki 的纯 HTML/CSS 报告。</p>
+    </div>
+    <div class="skill-card">
+      <div class="badge">Offline</div>
+      <h3>不依赖外网</h3>
+      <p>不使用在线字体、在线图片、CDN、PlantUML server 或 Mermaid CDN。</p>
+    </div>
+  </div>
+
+  <div class="wiki-note">Wiki 嵌入说明：本介绍页不包含任何 JavaScript，不包含 script 标签。视觉效果只使用 div 结构和 CSS 动画实现，适合复制到支持 HTML/CSS 的内网 Wiki 页面。</div>
+</div>
